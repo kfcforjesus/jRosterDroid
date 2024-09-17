@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/navigation_home"
-        android:icon="@drawable/jtools"
-        android:title="Home" />
-    <item
-        android:id="@+id/navigation_settings"
+        android:id="@+id/nav_settings"
         android:icon="@drawable/jtools"
         android:title="Settings" />
     <item
-        android:id="@+id/navigation_profile"
+        android:id="@+id/nav_roster"
         android:icon="@drawable/jtools"
-        android:title="Profile" />
+        android:title="Roster" />
+    <item
+        android:id="@+id/nav_friends"
+        android:icon="@drawable/jtools"
+        android:title="Friends" />
+
+
 </menu>

@@ -1,20 +1,58 @@
 package com.example.jroster
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.fragment.app.Fragment
+import com.example.jroster.databinding.ActivitySettingsBinding
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import android.util.Log
 
-class settingsActivity : AppCompatActivity() {
+class SettingsActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivitySettingsBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("Testing", "onCreate of SettingsActivity called")
+
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContentView(R.layout.activity_settings)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.settingsLayout)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+        binding = ActivitySettingsBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        // Set the initial fragment
+        replaceFragment(fragmentSettings())
+
+        // Set up the BottomNavigationView listener
+        val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottomNavigationView)
+        bottomNavigationView.setOnItemSelectedListener { item ->
+
+        when (item.itemId) {
+                R.id.nav_friends -> {
+                    replaceFragment(fragmentFriends())
+                    true
+                }
+                R.id.nav_roster -> {
+                    replaceFragment(fragmentRoster())
+                    true
+                }
+                R.id.nav_settings -> {
+                    replaceFragment(fragmentSettings())
+                    true
+                }
+                else -> false
+            }
         }
     }
+
+    private fun replaceFragment(fragment: Fragment) {
+        Log.d("Testing", "SettingsActivity - ReplaceFragmentCalled")
+        val fragmentManager = supportFragmentManager
+        val fragmentTransaction = fragmentManager.beginTransaction()
+
+        // Replace the container with the new fragment
+        fragmentTransaction.replace(R.id.fragment_container, fragment)
+
+        // Commit the transaction
+        fragmentTransaction.commit()
+    }
+
 }

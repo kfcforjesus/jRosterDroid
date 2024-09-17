@@ -12,9 +12,13 @@ import android.widget.Button
 import android.widget.EditText
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import android.util.Log
+
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("Testing", "OnCreate MainActivity")
+
         super.onCreate(savedInstanceState)
         window.setDecorFitsSystemWindows(false)
         setContentView(R.layout.activity_main)
@@ -50,9 +54,9 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // Set up the Sign In button to open SettingsButtonActivity
+        // Set up the Sign In button to open SettingsActivity
         signInButton.setOnClickListener {
-            val intent = Intent(this, settingsButtonActivity::class.java)
+            val intent = Intent(this, SettingsActivity::class.java) // Use the correct activity
             startActivity(intent)
         }
 

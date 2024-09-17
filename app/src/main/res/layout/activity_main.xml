@@ -126,7 +126,6 @@
         app:layout_constraintTop_toBottomOf="@id/logoImageView" />
 
 
-
     <!-- TextView for Remember Me Label -->
 
     <!-- Switch for Remember Me -->
