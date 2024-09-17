@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white">
+
+    <!-- Guideline positioned 20% from the top -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/topGuideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintGuide_percent="0.2"
+        android:orientation="horizontal" />
+
+    <!-- ImageView for the Logo positioned 20% from the top -->
+    <ImageView
+        android:id="@+id/logoImageView"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:src="@drawable/jtoolsblue"
+        android:background="@drawable/button_rounded"
+        android:clipToOutline="true"
+        app:layout_constraintTop_toTopOf="@id/topGuideline"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <EditText
+        android:id="@+id/passcodeEditText"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="32dp"
+        android:background="@drawable/edittext_underline"
+        android:backgroundTint="#F0F0F0"
+        android:gravity="center"
+        android:hint="Passcode"
+        android:inputType="number"
+        android:maxLength="3"
+        android:padding="10dp"
+        android:textColor="@color/design_default_color_primary_dark"
+        android:textSize="30sp"
+        android:textColorHint="#D0D0D0"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/userIDEditText" />
+
+    <Switch
+        android:id="@+id/rememberMeSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="24dp"
+        android:checked="true"
+        android:trackTint="#cdddf6"
+        app:layout_constraintStart_toEndOf="@id/rememberMeLabel"
+        app:layout_constraintTop_toBottomOf="@id/passcodeEditText" />
+
+    <Button
+        android:id="@+id/signInButton"
+        android:layout_width="247dp"
+        android:layout_height="65dp"
+        android:layout_marginTop="20dp"
+        android:backgroundTint="#cdddf6"
+        android:text="Sign In"
+        android:textColor="#555555"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rememberMeSwitch"
+        app:layout_constraintWidth_percent="0.6" />
+
+    <TextView
+        android:id="@+id/forgotLoginText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Forgot your Login?"
+        android:textColor="#555555"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/signInButton" />
+
+    <TextView
+        android:id="@+id/rememberMeLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="120dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="25dp"
+        android:text="Remember Me :"
+        android:textColor="#555555"
+        android:textSize="16sp"
+        app:layout_constraintBottom_toTopOf="@+id/signInButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/passcodeEditText"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <EditText
+        android:id="@+id/userIDEditText"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="44dp"
+        android:layout_marginEnd="32dp"
+        android:background="@drawable/edittext_underline"
+        android:backgroundTint="#F0F0F0"
+        android:gravity="center"
+        android:hint="User ID"
+        android:inputType="number"
+        android:maxLength="5"
+        android:padding="10dp"
+        android:textColor="@color/design_default_color_primary_dark"
+        android:textSize="30sp"
+        android:textColorHint="#D0D0D0"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/logoImageView" />
+
+
+
+    <!-- TextView for Remember Me Label -->
+
+    <!-- Switch for Remember Me -->
+
+    <!-- Button for Sign In -->
+
+    <!-- TextView for Forgot Your Login -->
+</androidx.constraintlayout.widget.ConstraintLayout>
