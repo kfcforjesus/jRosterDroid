@@ -76,10 +76,10 @@
 
             <TextView
                 android:id="@+id/nameLabel"
-                android:layout_width="78dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:layout_marginLeft="15dp"
+                android:layout_marginTop="8dp"
                 android:text="Name :"
                 android:textColor="#333333"
                 android:textSize="22sp" />
@@ -89,6 +89,7 @@
                 android:layout_width="238dp"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="7dp"
+                android:layout_marginLeft="7dp"
                 android:textColor="@color/design_default_color_primary_dark"
                 android:hint="Enter Name"
                 android:textColorHint="#D3D3D3"
@@ -98,7 +99,8 @@
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:minHeight="55dp">
 
             <TextView
                 android:id="@+id/baseLabel"
@@ -111,18 +113,20 @@
                 android:layout_marginLeft="25dp"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/baseSpinner" />
+                app:layout_constraintEnd_toStartOf="@+id/baseSpinner"
+                android:visibility="visible" />
 
             <Spinner
                 android:id="@+id/baseSpinner"
                 android:layout_width="200dp"
                 android:layout_height="50dp"
                 android:layout_marginTop="0dp"
-                android:layout_marginStart="2dp"
+                android:layout_marginStart="1dp"
                 android:spinnerMode="dropdown"
                 android:entries="@array/base_array"
                 app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintStart_toEndOf="@id/baseLabel" />
+                app:layout_constraintStart_toEndOf="@id/baseLabel"
+                android:visibility="visible" /> <!-- Make sure visibility is handled properly -->
 
             <Button
                 android:id="@+id/conditionButton"
@@ -133,11 +137,12 @@
                 android:textSize="20sp"
                 android:backgroundTint="#cdddf6"
                 android:textColor="#555555"
-                android:layout_marginTop="8dp"
-                app:layout_constraintTop_toBottomOf="@id/baseSpinner"
+                app:layout_constraintTop_toBottomOf="@id/nameEditText"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                app:layout_constraintEnd_toEndOf="parent"
+                tools:ignore="NotSibling" />
         </androidx.constraintlayout.widget.ConstraintLayout>
+
 
 
 
@@ -248,33 +253,33 @@
         android:id="@+id/bottomButtonsContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:layout_marginTop="16dp"
         android:gravity="center"
-        android:layout_marginTop="24dp"
-        app:layout_constraintTop_toBottomOf="@id/rosterSyncContainer"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/rosterSyncContainer">
 
         <Button
             android:id="@+id/instructionsButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Instructions"
-            android:backgroundTint="#cdddf6"
-            android:textColor="#555555"
-            android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:padding="12dp" />
+            android:layout_weight="1"
+            android:backgroundTint="#cdddf6"
+            android:padding="12dp"
+            android:text="Instructions"
+            android:textColor="#555555" />
 
         <Button
             android:id="@+id/logoutButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Logout"
-            android:backgroundTint="#cdddf6"
-            android:textColor="#555555"
             android:layout_weight="1"
-            android:padding="12dp" />
+            android:backgroundTint="#cdddf6"
+            android:padding="12dp"
+            android:text="Logout"
+            android:textColor="#555555" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
