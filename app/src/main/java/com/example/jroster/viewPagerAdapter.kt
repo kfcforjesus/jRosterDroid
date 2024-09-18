@@ -19,7 +19,7 @@ class ViewPagerAdapter(
         return when (position) {
             0 -> fragmentFriends()   // First Fragment (Friends)
             1 -> fragmentRoster()    // Second Fragment (Roster)
-            2 -> fragmentSettings()  // Third Fragment (Settings)
+            2 -> FragmentSettings()  // Third Fragment (Settings)
             else -> throw IllegalArgumentException("Invalid position")
         }
     }

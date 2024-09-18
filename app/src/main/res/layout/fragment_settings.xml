@@ -92,18 +92,55 @@
                 android:textColor="@color/design_default_color_primary_dark"
                 android:hint="Enter Name"
                 android:textColorHint="#D3D3D3"
-                android:textSize="22sp" />
+                android:textSize="26sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/baseLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="15dp"
-            android:text="Base :"
-            android:textSize="22sp"
-            android:textColor="#333333"
-            android:layout_marginTop="8dp" />
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/baseLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Base :"
+                android:textSize="22sp"
+                android:textColor="#333333"
+                android:layout_marginTop="12dp"
+                android:layout_marginLeft="25dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/baseSpinner" />
+
+            <Spinner
+                android:id="@+id/baseSpinner"
+                android:layout_width="200dp"
+                android:layout_height="50dp"
+                android:layout_marginTop="0dp"
+                android:layout_marginStart="2dp"
+                android:spinnerMode="dropdown"
+                android:entries="@array/base_array"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toEndOf="@id/baseLabel" />
+
+            <Button
+                android:id="@+id/conditionButton"
+                android:layout_width="205dp"
+                android:layout_height="60dp"
+                android:text="Save"
+                android:visibility="gone"
+                android:textSize="20sp"
+                android:backgroundTint="#cdddf6"
+                android:textColor="#555555"
+                android:layout_marginTop="8dp"
+                app:layout_constraintTop_toBottomOf="@id/baseSpinner"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+
     </LinearLayout>
 
     <!-- iCalendar Roster Export Section -->
@@ -135,7 +172,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_marginTop="8dp"
-            android:orientation="horizontal"> <!-- Center the RadioGroup -->
+            android:orientation="horizontal">
 
             <RadioButton
                 android:id="@+id/exportOff"
@@ -154,6 +191,7 @@
                 android:textColor="#555555"
                 android:textSize="20sp" />
         </RadioGroup>
+
 
     </LinearLayout>
 

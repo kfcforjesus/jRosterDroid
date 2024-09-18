@@ -1,5 +1,16 @@
 <resources>
     <string name="app_name">JRoster</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="hello_blank_fragment">Hello from Blank Fragment</string>
+
+    <string-array name="base_array">
+        <item>Adelaide</item>
+        <item>Avalon</item>
+        <item>Brisbane</item>
+        <item>Cairns</item>
+        <item>Gold Coast</item>
+        <item>Melbourne</item>
+        <item>Perth</item>
+        <item>SQE</item>
+        <item>Sydney</item>
+    </string-array>
 </resources>

@@ -1,75 +1,137 @@
 package com.example.jroster
 
+import com.example.jroster.R
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.View
-import android.view.inputmethod.InputMethodManager
-import android.content.Context
-import androidx.appcompat.app.AppCompatActivity
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import android.util.Log
-
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.example.jroster.SettingsActivity
+import okhttp3.*
+import org.json.JSONObject
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("Testing", "OnCreate MainActivity")
 
+    private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var userIDEditText: EditText
+    private lateinit var passcodeEditText: EditText
+    private lateinit var signInButton: Button
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setDecorFitsSystemWindows(false)
         setContentView(R.layout.activity_main)
 
-        val userIDEditText = findViewById<EditText>(R.id.userIDEditText)
-        val passcodeEditText = findViewById<EditText>(R.id.passcodeEditText)
-        val signInButton = findViewById<Button>(R.id.signInButton)
+        // Initialize SharedPreferences
+        sharedPreferences = getSharedPreferences("userPrefs", MODE_PRIVATE)
 
-        // Add TextWatcher to userIDEditText
-        userIDEditText.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        // Check if the login token exists
+        val loginTokenExists = sharedPreferences.getBoolean("loginToken", false)
 
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (s?.length == 5) {
-                    passcodeEditText.requestFocus() // Automatically move focus to passcode field
-                }
-            }
-
-            override fun afterTextChanged(s: Editable?) {}
-        })
-
-        // Add TextWatcher to passcodeEditText
-        passcodeEditText.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-
-            override fun afterTextChanged(s: Editable?) {
-                if (s?.length == 3) {
-                    passcodeEditText.clearFocus() // Clear focus from passcode field
-                    hideKeyboard(passcodeEditText) // Hide the keyboard
-                }
-            }
-        })
-
-        // Set up the Sign In button to open SettingsActivity
-        signInButton.setOnClickListener {
-            val intent = Intent(this, SettingsActivity::class.java) // Use the correct activity
+        if (loginTokenExists) {
+            // If login token exists, proceed to the settings activity
+            Log.d("MainActivity", "Login token found. Redirecting to SettingsActivity.")
+            val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
-        }
-
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainLayout)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+            finish() // Stop back key by dropping from stack
+        } else {
+            Log.d("MainActivity", "No login token found. Staying on MainActivity.")
+            initializeUI()
         }
     }
 
-    // Function to hide the keyboard
-    private fun hideKeyboard(view: View) {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(view.windowToken, 0)
+    // Setup the UI in event of successful login
+    private fun initializeUI() {
+        // Initialize UI components
+        userIDEditText = findViewById(R.id.userIDEditText)
+        passcodeEditText = findViewById(R.id.passcodeEditText)
+        signInButton = findViewById(R.id.signInButton)
+
+        // Set up the Sign In button listener
+        signInButton.setOnClickListener {
+            val userID = userIDEditText.text.toString()
+            val passCode = passcodeEditText.text.toString()
+            performLogin(userID, passCode)
+        }
+    }
+
+    private fun performLogin(userID: String, passCode: String) {
+        val url = "http://flightschoolms.com/JRoster/login.php"
+
+        // Create a client
+        val client = OkHttpClient()
+
+        // Create request body
+        val requestBody = FormBody.Builder()
+            .add("userID", userID)
+            .add("passCode", passCode)
+            .build()
+
+        // Create a request
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .build()
+
+        // Make an asynchronous call
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Failed to connect to server: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (!response.isSuccessful) {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Server returned status code ${response.code}", Toast.LENGTH_LONG).show()
+                    }
+                    return
+                }
+
+                val responseData = response.body?.string()
+                if (responseData != null) {
+                    try {
+                        val json = JSONObject(responseData)
+                        val status = json.getString("status")
+                        val message = json.getString("message")
+
+                        runOnUiThread {
+                            if (status == "success") {
+                                // Save login info in SharedPreferences
+                                val sharedPreferences = getSharedPreferences("userPrefs", MODE_PRIVATE)
+                                val editor = sharedPreferences.edit()
+                                editor.putBoolean("loginToken", true)
+                                editor.putString("userID", userID)
+                                editor.putString("passCode", passCode)
+                                editor.apply()
+
+                                // Open the SettingsButtonActivity
+                                val intent = Intent(this@MainActivity, SettingsActivity::class.java)
+                                startActivity(intent)
+                                finish() // Close the current activity
+                            } else {
+                                Toast.makeText(this@MainActivity, "Login Error: $message", Toast.LENGTH_LONG).show()
+                                // Reset the input fields
+                                userIDEditText.text.clear()
+                                passcodeEditText.text.clear()
+                                userIDEditText.requestFocus()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Failed to parse response: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "No data received from server", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        })
     }
 }

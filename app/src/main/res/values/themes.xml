@@ -8,5 +8,9 @@
 
         <!-- Set the default text color for the entire app -->
         <item name="android:textColor">#333333</item> <!-- Dark gray color -->
+
+        <!-- Disable all caps for buttons by default -->
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item> <!-- For compatibility with Material Components -->
     </style>
 </resources>

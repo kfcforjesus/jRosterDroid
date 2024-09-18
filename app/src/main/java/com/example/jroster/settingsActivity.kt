@@ -19,7 +19,7 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         // Set the initial fragment
-        replaceFragment(fragmentSettings())
+        replaceFragment(FragmentSettings())
 
         // Set up the BottomNavigationView listener
         val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottomNavigationView)
@@ -35,7 +35,7 @@ class SettingsActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_settings -> {
-                    replaceFragment(fragmentSettings())
+                    replaceFragment(FragmentSettings())
                     true
                 }
                 else -> false
