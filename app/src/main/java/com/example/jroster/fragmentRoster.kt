@@ -47,37 +47,39 @@ class FragmentRoster : Fragment() {
                 if (response.isSuccessful) {
                     val rosterData = response.body()
 
-
-
-                    // Check if rosterData is not null
+                    // Check if rosterData is not null and show the number of records
                     rosterData?.let {
                         val recordCount = it.size
-                        // Log the number of records
-                        Log.d("RosterData", "Number of records: $recordCount")
+                        // Show the number of records using a Toast
+                        Toast.makeText(requireContext(), "Number of records: $recordCount", Toast.LENGTH_SHORT).show()
 
-                        // Loop through each entry and log the data
+                        Log.d("LOL", "$rosterData")
+
+
+                        // Log each piece of data
                         for (data in it) {
-                            Log.d("RosterData", "Date: ${data.date}, Activity: ${data.activity}, SignOn: ${data.CI}, ATD: ${data.ATD}, ATA: ${data.ATA}, Orig: ${data.orig}, Dest: ${data.dest}, SignOff: ${data.CO}")
+                            Log.d("RosterData", "Date: ${data.date}, Activity: ${data.activity}, SignOn: ${data.checkIn ?: "N/A"}, ATD: ${data.atd ?: "N/A"}, ATA: ${data.ata ?: "N/A"}, Orig: ${data.orig}, Dest: ${data.dest}, SignOff: ${data.checkOut ?: "N/A"}")
                         }
 
-                        // You can also update the RecyclerView here with the retrieved data
+                        // Update RecyclerView if needed
                         updateRecyclerView(it)
                     } ?: run {
-                        // Log if no records were found
-                        Log.d("RosterData", "No records found")
+                        // Show a Toast if there are no records
+                        Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    // Log the error
-                    Log.d("RosterData", "Failed to fetch data")
+                    // Handle the error case
+                    Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
                 }
             }
 
             override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
-                // Log the failure
-                Log.e("RosterData", "Error: ${t.message}")
+                // Show a Toast if there is a failure
+                Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         })
     }
+
 
 
     fun updateRecyclerView(rosterData: List<DbData>) {
