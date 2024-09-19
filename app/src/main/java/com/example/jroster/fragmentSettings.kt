@@ -21,6 +21,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.ArrayAdapter
+import android.widget.Toast
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -53,6 +54,23 @@ class FragmentSettings : Fragment() {
         exportRadioGroup = view.findViewById(R.id.exportRadioGroup)
         exportOffButton = view.findViewById(R.id.exportOff)
         exportOnButton = view.findViewById(R.id.exportOn)
+
+        // Inside your Fragment's onCreateView or onViewCreated method
+        val instructionsButton = view.findViewById<Button>(R.id.instructionsButton)
+
+        // Set an OnClickListener for the button
+        instructionsButton.setOnClickListener {
+            // Get access to SharedPreferences
+            val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+
+            // Clear all the stored preferences
+            val editor = sharedPreferences.edit()
+            editor.clear() // This will remove all saved data
+            editor.apply() // Apply the changes
+
+            // Notify the user
+            Toast.makeText(requireContext(), "All preferences have been cleared!", Toast.LENGTH_SHORT).show()
+        }
 
         // Initialize SharedPreferences
         sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
