@@ -31,7 +31,7 @@ class SettingsActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_roster -> {
-                    replaceFragment(fragmentRoster())
+                    replaceFragment(FragmentRoster())
                     true
                 }
                 R.id.nav_settings -> {

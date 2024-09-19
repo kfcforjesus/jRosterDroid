@@ -2,16 +2,14 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/nav_settings"
-        android:icon="@drawable/jtools"
+        android:icon="@drawable/settings"
         android:title="Settings" />
     <item
         android:id="@+id/nav_roster"
-        android:icon="@drawable/jtools"
+        android:icon="@drawable/calendar"
         android:title="Roster" />
     <item
         android:id="@+id/nav_friends"
-        android:icon="@drawable/jtools"
+        android:icon="@drawable/friends"
         android:title="Friends" />
-
-
 </menu>

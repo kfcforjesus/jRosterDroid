@@ -86,7 +86,7 @@ class FragmentSettings : Fragment() {
 
                     Log.d("VisibilityCheck", "Name entered: Save button visible, Spinner gone")
                 } else {
-                    saveButton.visibility = View.INVISIBLE
+                    saveButton.visibility = View.GONE
                     baseLabel.visibility = View.VISIBLE
                     baseSpinner.visibility = View.VISIBLE
                     Log.d("VisibilityCheck", "Name cleared: Save button hidden, Spinner visible")

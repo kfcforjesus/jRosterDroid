@@ -20,12 +20,16 @@
     <!-- BottomNavigationView for Tab Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigationView"
-        android:layout_width="0dp"
-        android:layout_height="80dp"
-        android:background="#f3f3f3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="67dp"
+        android:background="#ffffff"
         app:itemIconTint="@color/nav_item_color_selector"
         app:itemTextColor="@color/nav_item_color_selector"
         app:menu="@menu/bottom_nav_menu"
+        app:itemTextAppearanceActive="@style/BottomNavTextStyle"
+        app:itemTextAppearanceInactive="@style/BottomNavTextStyle"
+        style="@style/BottomNavigationViewItem"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

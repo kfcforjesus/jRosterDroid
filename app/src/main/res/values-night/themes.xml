@@ -1,7 +1,16 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.JRoster" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+    <style name="Theme.JRoster" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Your existing theme properties -->
+        <item name="colorPrimary">#003366</item>
+        <item name="colorPrimaryDark">#002244</item>
+        <item name="colorAccent">#003366</item>
+
+        <!-- Set the default text color for the entire app -->
+        <item name="android:textColor">#333333</item> <!-- Dark gray color -->
+
+        <!-- Disable all caps for buttons by default -->
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item> <!-- For compatibility with Material Components -->
     </style>
 </resources>
