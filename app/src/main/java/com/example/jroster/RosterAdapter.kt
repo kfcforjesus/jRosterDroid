@@ -166,6 +166,7 @@ class RosterAdapter(
                 "OFF" to "Day Off",
                 "STB" to "Standby",
                 "DBF" to "Debrief",
+                "FTG" to "Fatigue",
                 "FDO" to "Fixed Day Off",
                 "UFD" to "UFD",
                 "LVE" to "Leave",
@@ -357,6 +358,8 @@ class RosterAdapter(
                 "Avail for Training" to R.drawable.phone_callback_24dp_5f6368_fill0_wght400_grad0_opsz24,
                 "Debrief" to R.drawable.swords,
                 "Admin" to R.drawable.smiley,
+                "FTG" to R.drawable.fatigue,
+                "XSB" to R.drawable.phone_callback_24dp_5f6368_fill0_wght400_grad0_opsz24
             )
 
             // Handle special activities where the route should be blank and the times adjusted
@@ -384,9 +387,10 @@ class RosterAdapter(
                 "" to " "
             )
 
-            Log.d("Cunt", entry.activity)
+            // Paxing?
+            val dutyDesignator = dutyMapping[entry.dd]
 
-            if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO").contains(entry.activity)) {
+            if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO", "FTG").contains(entry.activity)) {
 
                 // Move flightRouteTextView down by 8 pixels
                 val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
@@ -411,8 +415,73 @@ class RosterAdapter(
 
                 flightDataTextView.isGone = true
 
+            // ------------- HANDLE PICKUP AND TRANSPORT DUTIES -------------------------
+            } else if (listOf("PCK", "HTC","A2B", "A2H", "A2S", "A3S", "ATC", "B2A", "B2T", "G2H", "G2M", "H22", "H2A", "H2G",
+                    "H2J", "H2Q", "H2S", "H2T", "H2W", "H3S", "J2H", "J2S", "M22", "M2G", "M2W", "Q2H",
+                    "Q2S", "S2A", "S2H", "S2J", "S2Q", "S3A", "S3H", "SAK", "T2B", "T2H", "TCA", "TCH",
+                    "W2H", "W2M").contains(entry.activity)) {
+
+                flightRouteTextView.text = activityMapping[entry.activity]
+                flightDataTextView.text = ""
+                flightTimesTextView.text = formatTime(entry.atd) // Only check-in time is shown
+
+                // Set the appropriate icon
+                val iconRes = R.drawable.bus // Default airplane icon
+
+                flightIcon.setImageResource(iconRes)
+
+                flightDataTextView.isGone = true
+
+                // Move the flightRouteTextView down by 8 pixels
+                val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutFlight = flightTimesTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutIcon = flightIcon.layoutParams as ViewGroup.MarginLayoutParams
+
+                layoutIcon.topMargin = 18
+                layoutParams.topMargin = 20
+                layoutFlight.topMargin = 15
 
 
+
+
+            // ------------- HANDLE SIM DUTIES -------------------------
+            } else if (listOf("SIC", "SIA", "SB2", "CVA", "A06", "SD7", "L03", "L02", "L01", "A01", "A02", "A04",
+                "A05", "A07", "A08", "A09", "AAS", "AB1", "AB2", "AB3", "AB4", "AB5", "AB6", "AB7",
+                "AB8", "AB9", "AF1", "AF2", "AF3", "AF4", "AF5", "AF6", "AF7", "AF8", "AF9", "AFL",
+                "AT1", "AT2", "AT3", "AT4", "B02", "B05", "B06", "B07", "BAS", "BCL", "BF1", "BF2",
+                "BF3", "BF4", "BF5", "BF6", "BF7", "BF8", "BFL", "BST", "BT1", "BT2", "BT3", "BT4",
+                "CMC", "CMM", "CMP", "CPS", "CR2", "CT3", "CTC", "FF5", "FF9", "FFP", "FFS", "FSE",
+                "ILC", "IP1", "ITM", "LOT", "MPS", "PCS", "RIS", "RNV", "RTE", "RTS", "SD2", "SD3",
+                "SI1", "SI2", "SI3", "SI4", "SID", "SIT", "SR2", "SR3", "SR7", "SRV", "ST2", "ST3",
+                "ST7", "TRT", "ZRS", "ZRI", "ZNI", "STP", "SIM", "SB7", "ALV", "A03").contains(entry.activity)) {
+
+                // Handle other activities based on mapping
+                val activityText = activityMapping[entry.activity] ?: entry.activity
+                flightRouteTextView.text = "Sim"
+                flightDataTextView.text = activityText
+
+                // Reset top margin for non-"Sign On" duties
+                val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutFlight = flightTimesTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutIcon = flightIcon.layoutParams as ViewGroup.MarginLayoutParams
+
+                layoutIcon.topMargin = 28
+                layoutParams.topMargin = 0
+                layoutFlight.topMargin = 14
+
+                flightDataTextView.isGone = false
+
+                // Handle duty timings (ata, atd)
+                val atd = formatTime(entry.atd)
+                val ata = formatTime(entry.ata)
+                flightTimesTextView.text = "$atd - $ata"
+
+                // Set the appropriate icon
+                val iconRes = iconMapping[activityText] ?: R.drawable.sim2 // Default airplane icon
+                flightIcon.setImageResource(iconRes)
+
+
+            // -------------- HANDLE SIGN ON ONLY --------------------------------------
             } else if (entry.activity == "Sign on") {
                 flightRouteTextView.text = "Sign On"
                 flightDataTextView.text = ""
@@ -430,11 +499,14 @@ class RosterAdapter(
                 layoutParams.topMargin = 20
                 layoutFlight.topMargin = 15
 
+
+            // ------------------- ALL OTHER DUTIES -------------------------------------
             } else {
                 // Handle other activities based on mapping
                 val activityText = activityMapping[entry.activity] ?: entry.activity
+                val extraString = "- ${dutyDesignator}"
+
                 flightRouteTextView.text = "${entry.orig} - ${entry.dest}"
-                flightDataTextView.text = activityText
 
                 // Reset top margin for non-"Sign On" duties
                 val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
@@ -443,11 +515,9 @@ class RosterAdapter(
 
                 layoutIcon.topMargin = 28
                 layoutParams.topMargin = 0
-                layoutFlight.topMargin = 14
+                layoutFlight.topMargin = 12
 
                 flightDataTextView.isGone = false
-
-                Log.d("Cunt", "Sequence 3")
 
                 // Handle duty timings (ata, atd)
                 val atd = formatTime(entry.atd)
@@ -455,9 +525,18 @@ class RosterAdapter(
                 flightTimesTextView.text = "$atd - $ata"
 
                 // Set the appropriate icon
-                val iconRes = iconMapping[activityText] ?: R.drawable.plane // Default airplane icon
-                flightIcon.setImageResource(iconRes)
 
+                if (dutyDesignator != null) {
+                    Log.d("Cunt2", dutyDesignator)
+                }
+
+                if (dutyDesignator == "(Paxing)" || dutyDesignator == "(Deadhead)") {
+                    flightIcon.setImageResource(R.drawable.paxing)
+                    flightDataTextView.text = "${activityText} ${extraString}"
+                } else {
+                    flightIcon.setImageResource(R.drawable.plane)
+                    flightDataTextView.text = activityText
+                }
 
             }
 
