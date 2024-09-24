@@ -86,7 +86,6 @@ class FragmentSettings : Fragment() {
             nameEditText.setText(storedName)
         } else {
             // If name does not exist, fetch from MySQL
-
             val userID = sharedPreferences.getString("userID", "") ?: ""
             fetchFriendDataFromMySQL(userID)
         }
@@ -101,13 +100,10 @@ class FragmentSettings : Fragment() {
                     baseLabel.visibility = View.GONE
                     baseSpinner.visibility = View.GONE
                     saveButton.visibility = View.VISIBLE
-
-                    Log.d("VisibilityCheck", "Name entered: Save button visible, Spinner gone")
                 } else {
                     saveButton.visibility = View.GONE
                     baseLabel.visibility = View.VISIBLE
                     baseSpinner.visibility = View.VISIBLE
-                    Log.d("VisibilityCheck", "Name cleared: Save button hidden, Spinner visible")
                 }
             }
 
@@ -251,7 +247,6 @@ class FragmentSettings : Fragment() {
             }
         })
     }
-
 
     private fun saveAction() {
         // Remove focus from the EditText

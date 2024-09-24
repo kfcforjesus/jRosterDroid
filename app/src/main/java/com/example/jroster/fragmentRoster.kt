@@ -50,8 +50,8 @@ class FragmentRoster : Fragment() {
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
 
         // Retrieve userID and passCode as integers
-        val userID = sharedPreferences.getString("userID", "123") // Default to 123 if not found
-        val passCode = sharedPreferences.getString("passCode", "456") // Default to 456 if not found
+        val userID = sharedPreferences.getString("userID", "123") // Default to 123 if not found.. Itll throw an error
+        val passCode = sharedPreferences.getString("passCode", "456")
 
         val recyclerView = view.findViewById<RecyclerView>(R.id.rosterRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -80,16 +80,9 @@ class FragmentRoster : Fragment() {
                     rosterData?.let {
                         val recordCount = it.size
 
-                        // Log each piece of data
-                        for (data in it) {
-                            Log.d("RosterData", "Date: ${data.date}, Activity: ${data.activity}, SignOn: ${data.checkIn ?: "N/A"}, ATD: ${data.atd ?: "N/A"}, ATA: ${data.ata ?: "N/A"}, Orig: ${data.orig}, Dest: ${data.dest}, SignOff: ${data.checkOut ?: "N/A"}")
-                        }
-
                         val updatedRosterEntries = processEntriesForSignOn(it)
                         updateRecyclerView(updatedRosterEntries)
 
-                        // Update RecyclerView with the data
-                        //updateRecyclerView(it)
                     } ?: run {
                         // Show a Toast if there are no records
                         Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
@@ -125,13 +118,12 @@ class FragmentRoster : Fragment() {
 
     // Scroll to yesterday's date. Which is actually today, but Kotlin is retarded
     private fun scrollToClosestDate(sortedDates: List<String>, entriesByDate: Map<String, List<DbData>>, recyclerView: RecyclerView) {
-        // Get today's date and subtract one day to get yesterday's date
         val calendar = Calendar.getInstance()
         calendar.time = Date()
         calendar.add(Calendar.DAY_OF_YEAR, -1) // Subtract one day
         val yesterday = calendar.time
 
-        // Date format that matches your date strings
+        // Standard formatter
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
         var closestDateIndex: Int? = null
@@ -166,6 +158,7 @@ class FragmentRoster : Fragment() {
         }
     }
 
+    // Create the signon duties out of nothing.  Boss.
     private fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
         val updatedEntries = mutableListOf<DbData>()
         val seenCheckInTimesByDate = mutableMapOf<String, MutableSet<Date>>()
@@ -235,11 +228,4 @@ class FragmentRoster : Fragment() {
             dateFormatter.format(date)
         } ?: ""
     }
-
-
-
-
-
-
-
 }
