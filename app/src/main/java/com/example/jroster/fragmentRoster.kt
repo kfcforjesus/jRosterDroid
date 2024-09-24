@@ -7,7 +7,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import retrofit2.Call
@@ -31,6 +33,16 @@ class FragmentRoster : Fragment() {
         // Initialize RecyclerView
         recyclerView = view.findViewById(R.id.rosterRecyclerView)
 
+        // Create a divider so i can see where shit is
+        val dividerDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.divider)
+        val dividerItemDecordation = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
+
+        dividerDrawable?.let {
+            dividerItemDecordation.setDrawable(it)
+        }
+
+        recyclerView.addItemDecoration(dividerItemDecordation)
+
         // Set the LayoutManager for the RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
@@ -41,8 +53,12 @@ class FragmentRoster : Fragment() {
         val userID = sharedPreferences.getString("userID", "123") // Default to 123 if not found
         val passCode = sharedPreferences.getString("passCode", "456") // Default to 456 if not found
 
-        // Test
-        Toast.makeText(requireContext(), "UserID: $userID, PassCode: $passCode", Toast.LENGTH_SHORT).show()
+        val recyclerView = view.findViewById<RecyclerView>(R.id.rosterRecyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
+        // Add a divider between items
+        val dividerItemDecoration = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
+        recyclerView.addItemDecoration(dividerItemDecoration)
 
         // Fetch the roster data
         fetchRosterData(userID.toString(), passCode.toString())
@@ -69,8 +85,11 @@ class FragmentRoster : Fragment() {
                             Log.d("RosterData", "Date: ${data.date}, Activity: ${data.activity}, SignOn: ${data.checkIn ?: "N/A"}, ATD: ${data.atd ?: "N/A"}, ATA: ${data.ata ?: "N/A"}, Orig: ${data.orig}, Dest: ${data.dest}, SignOff: ${data.checkOut ?: "N/A"}")
                         }
 
+                        val updatedRosterEntries = processEntriesForSignOn(it)
+                        updateRecyclerView(updatedRosterEntries)
+
                         // Update RecyclerView with the data
-                        updateRecyclerView(it)
+                        //updateRecyclerView(it)
                     } ?: run {
                         // Show a Toast if there are no records
                         Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
@@ -104,7 +123,7 @@ class FragmentRoster : Fragment() {
         scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
     }
 
-    // Scroll to yesterday's date
+    // Scroll to yesterday's date. Which is actually today, but Kotlin is retarded
     private fun scrollToClosestDate(sortedDates: List<String>, entriesByDate: Map<String, List<DbData>>, recyclerView: RecyclerView) {
         // Get today's date and subtract one day to get yesterday's date
         val calendar = Calendar.getInstance()
@@ -146,6 +165,77 @@ class FragmentRoster : Fragment() {
             recyclerView.scrollToPosition(it)
         }
     }
+
+    private fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
+        val updatedEntries = mutableListOf<DbData>()
+        val seenCheckInTimesByDate = mutableMapOf<String, MutableSet<Date>>()
+
+        // Define the cutoff date (January 1, 1980)
+        val cutoffDate = Calendar.getInstance().apply {
+            set(1980, Calendar.JANUARY, 1, 0, 0, 0)
+        }.time
+
+        for (entry in rosterEntries) {
+            // Ensure there's a set for each date to track seen check-in times
+            if (seenCheckInTimesByDate[entry.date] == null) {
+                seenCheckInTimesByDate[entry.date] = mutableSetOf()
+            }
+
+            // Check for WDO-related activities and skip adding a "Sign on" for them
+            if (listOf("WDO", "WDA", "WDT", "WDE").contains(entry.activity)) {
+                continue // Skip adding this entry
+            }
+
+            // Check if check-in is after the cutoff date (January 1, 1980)
+            val checkInDate = entry.checkIn?.let { parseDate(it) }
+            if (checkInDate != null && checkInDate.after(cutoffDate)) {
+                // Check if the check-in time is not already seen for this date and not the same as atd
+                val atdDate = entry.atd?.let { parseDate(it) }
+                if (!seenCheckInTimesByDate[entry.date]!!.contains(checkInDate) && checkInDate != atdDate) {
+                    seenCheckInTimesByDate[entry.date]!!.add(checkInDate)
+
+                    // Create a new "Sign on" entry
+                    val signOnEntry = DbData(
+                        activity = "Sign on",
+                        ata = null.toString(),
+                        atd = formatDate(checkInDate),
+                        checkIn = null.toString(),
+                        checkOut = null.toString(),
+                        date = entry.date,
+                        dest = entry.dest,
+                        orig = entry.orig,
+                        ac = null.toString(),
+                        dd = null.toString()
+                    )
+                    updatedEntries.add(signOnEntry)
+                }
+            }
+
+            // Add the original entry
+            updatedEntries.add(entry)
+        }
+
+        return updatedEntries
+    }
+
+    // Helper function to parse date string into Date object
+    private fun parseDate(dateString: String): Date? {
+        return try {
+            val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            dateFormatter.parse(dateString)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Helper function to format Date object into string (yyyy-MM-dd HH:mm:ss)
+    private fun formatDate(date: Date?): String {
+        return date?.let {
+            val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            dateFormatter.format(date)
+        } ?: ""
+    }
+
 
 
 
