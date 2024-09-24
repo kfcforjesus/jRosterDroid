@@ -5,8 +5,9 @@
         <item name="itemIconSize">34dp</item>
         <item name="itemTextAppearanceActive">@style/BottomNavTextStyle</item>
         <item name="itemTextAppearanceInactive">@style/BottomNavTextStyle</item>
-        <item name="android:minHeight">80dp</item>
-        <item name="android:paddingBottom">15dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:paddingTop">12dp</item>
+
     </style>
 
     <!-- Define text style for BottomNavigationView items -->

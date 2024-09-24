@@ -8,11 +8,18 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import java.text.SimpleDateFormat
+import java.util.*
 
 class FragmentRoster : Fragment() {
+
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var rosterAdapter: RosterAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -21,7 +28,13 @@ class FragmentRoster : Fragment() {
         // Inflate the layout for this fragment
         val view = inflater.inflate(R.layout.fragment_roster, container, false)
 
-        // Fetch userID and passCode from SharedPreferences as Integers
+        // Initialize RecyclerView
+        recyclerView = view.findViewById(R.id.rosterRecyclerView)
+
+        // Set the LayoutManager for the RecyclerView
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
+        // Fetch userID and passCode from SharedPreferences
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
 
         // Retrieve userID and passCode as integers
@@ -31,7 +44,7 @@ class FragmentRoster : Fragment() {
         // Test
         Toast.makeText(requireContext(), "UserID: $userID, PassCode: $passCode", Toast.LENGTH_SHORT).show()
 
-        // Convert the integers to strings for API call
+        // Fetch the roster data
         fetchRosterData(userID.toString(), passCode.toString())
 
         return view
@@ -50,18 +63,13 @@ class FragmentRoster : Fragment() {
                     // Check if rosterData is not null and show the number of records
                     rosterData?.let {
                         val recordCount = it.size
-                        // Show the number of records using a Toast
-                        Toast.makeText(requireContext(), "Number of records: $recordCount", Toast.LENGTH_SHORT).show()
-
-                        Log.d("LOL", "$rosterData")
-
 
                         // Log each piece of data
                         for (data in it) {
                             Log.d("RosterData", "Date: ${data.date}, Activity: ${data.activity}, SignOn: ${data.checkIn ?: "N/A"}, ATD: ${data.atd ?: "N/A"}, ATA: ${data.ata ?: "N/A"}, Orig: ${data.orig}, Dest: ${data.dest}, SignOff: ${data.checkOut ?: "N/A"}")
                         }
 
-                        // Update RecyclerView if needed
+                        // Update RecyclerView with the data
                         updateRecyclerView(it)
                     } ?: run {
                         // Show a Toast if there are no records
@@ -80,11 +88,68 @@ class FragmentRoster : Fragment() {
         })
     }
 
-
-
+    // Populate the roster table
     fun updateRecyclerView(rosterData: List<DbData>) {
-        // Update your RecyclerView adapter with the data here
-        //rosterAdapter.submitList(rosterData)
+        // Organize roster data by date
+        val entriesByDate = rosterData.groupBy { it.date }
+        val sortedDates = entriesByDate.keys.sorted()
+
+        // Set up the adapter with the grouped data
+        rosterAdapter = RosterAdapter(sortedDates, entriesByDate)
+
+        // Set the adapter for the RecyclerView
+        recyclerView.adapter = rosterAdapter
+
+        // Scroll to the date closest to today
+        scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
     }
+
+    // Scroll to yesterday's date
+    private fun scrollToClosestDate(sortedDates: List<String>, entriesByDate: Map<String, List<DbData>>, recyclerView: RecyclerView) {
+        // Get today's date and subtract one day to get yesterday's date
+        val calendar = Calendar.getInstance()
+        calendar.time = Date()
+        calendar.add(Calendar.DAY_OF_YEAR, -1) // Subtract one day
+        val yesterday = calendar.time
+
+        // Date format that matches your date strings
+        val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        var closestDateIndex: Int? = null
+        var smallestTimeInterval: Long = Long.MAX_VALUE
+        var currentIndex = 0 // Keeps track of the overall index (date header + duties)
+
+        // Loop through sortedDates and calculate the index
+        for (i in sortedDates.indices) {
+            val dateString = sortedDates[i]
+            val parsedDate = dateFormatter.parse(dateString)
+
+            parsedDate?.let {
+                val timeInterval = it.time - yesterday.time
+
+                // Check if this date is closer to yesterday
+                if (Math.abs(timeInterval) < smallestTimeInterval) {
+                    smallestTimeInterval = Math.abs(timeInterval)
+                    closestDateIndex = currentIndex
+                }
+            }
+
+            // Add 1 for the date header
+            currentIndex++
+
+            // Add the number of duties for this date to currentIndex
+            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0
+        }
+
+        // Scroll to the closest date index if found
+        closestDateIndex?.let {
+            recyclerView.scrollToPosition(it)
+        }
+    }
+
+
+
+
+
 
 }
