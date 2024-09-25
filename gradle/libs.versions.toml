@@ -13,6 +13,7 @@ coordinatorlayout = "1.2.0"
 okhttp = "4.10.0"
 retrofit = "2.9.0"
 gson = "2.9.0"
+switchSegmentedControl = "1.0.5"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,6 +29,7 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+switch-segmented-control = { group = "com.github.classiczires", name = "Android-Switch-Segmented-Control", version.ref = "switchSegmentedControl" }
 
 
 [plugins]

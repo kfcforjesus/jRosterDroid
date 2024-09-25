@@ -21,12 +21,14 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <View
+        android:id="@+id/view"
         android:layout_width="match_parent"
         android:layout_height="1dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="230dp"
         android:background="#6A5ACD"
-        android:layout_marginLeft="20dp"
-        android:layout_marginRight="20dp"
-        android:layout_marginBottom="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rosterTitle" />
 
     <!-- RecyclerView for displaying roster data -->
@@ -40,5 +42,44 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rosterTitle"
         tools:listitem="@layout/duty_row_layout" />
+
+    <!--<Switch
+        android:id="@+id/switch1"
+        android:layout_width="130dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="16dp"
+        android:text="Local Time"
+        app:layout_constraintBottom_toTopOf="@+id/view"
+        app:layout_constraintEnd_toEndOf="@+id/view"
+        app:layout_constraintTop_toTopOf="parent" />-->
+
+    <com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
+        android:id="@+id/zires_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        app:activeBgColor="#6A5ACD"
+        app:activeTextColor="@android:color/white"
+        app:backgroundColor="@android:color/white"
+        app:borderColor="#6A5ACD"
+        app:checked="true"
+        app:cornerRadius="8dp"
+        app:inactiveTextColor="@android:color/darker_gray"
+        app:layout_constraintBottom_toTopOf="@+id/view"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:strokeWidth="1dp"
+        app:switchFontFamily="sans-serif"
+        app:textSize="5sp"
+        app:textToggleLeft="Local"
+        app:textToggleRight="Melbourne" />
+
+
+
+
+
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -13,10 +13,12 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 class RosterAdapter(
     private val sortedDates: List<String>,
-    private val entriesByDate: Map<String, List<DbData>>
+    private val entriesByDate: Map<String, List<DbData>>,
+    private val extAirports: extAirports
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val VIEW_TYPE_DATE_HEADER = 0
@@ -44,10 +46,11 @@ class RosterAdapter(
         } else if (holder is RosterEntryViewHolder) {
             val entry = getEntryForPosition(position)
             entry?.let {
-                holder.bind(it, ::formatTime)
+                holder.bind(it, extAirports, ::formatTime) // Pass extAirports along with formatTime
             }
         }
     }
+
 
     // Function to format date (2024-12-18 -> Tue 24 Sep 2024)
     fun formatDate(date: String): String {
@@ -68,6 +71,9 @@ class RosterAdapter(
 
         val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val outputFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+        inputFormat.timeZone =  TimeZone.getTimeZone("UTC")
+        outputFormat.timeZone = TimeZone.getTimeZone("UTC")
 
         return try {
             val date = inputFormat.parse(dateTime)
@@ -116,12 +122,14 @@ class RosterAdapter(
 
         // Modify the bind function to properly format and display the date
         fun bind(date: String) {
-            // Date formatter for parsing the date string
-            val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            // Date formatter for parsing the date string in UTC
+            var dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
             val displayedDateFormatter = SimpleDateFormat("EEE dd MMM yyyy", Locale.getDefault())
 
-            // Get today's date at midnight
-            val today = Calendar.getInstance()
+            // Get today's date at midnight in UTC
+            val today = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
             today.time = Date()
             today.set(Calendar.HOUR_OF_DAY, 0)
             today.set(Calendar.MINUTE, 0)
@@ -151,6 +159,7 @@ class RosterAdapter(
         }
     }
 
+
     class RosterEntryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val flightIcon: ImageView = itemView.findViewById(R.id.flightIcon)
         private val flightRouteTextView: TextView = itemView.findViewById(R.id.flightRoute)
@@ -158,7 +167,7 @@ class RosterAdapter(
         private val flightTimesTextView: TextView = itemView.findViewById(R.id.flightTimes)
 
         @SuppressLint("SetTextI18n")
-        fun bind(entry: DbData, formatTime: (String?) -> String) {
+        fun bind(entry: DbData, extAirports: extAirports, formatTime: (String?) -> String) {
             // Special mapping of activities for customization
 
             val activityMapping = mapOf(
@@ -356,29 +365,11 @@ class RosterAdapter(
                 "Star Day" to R.drawable.hotel_class_24dp_5f6368_fill0_wght400_grad0_opsz24,
                 "Extended STBY Period" to R.drawable.phone_callback_24dp_5f6368_fill0_wght400_grad0_opsz24,
                 "Avail for Training" to R.drawable.phone_callback_24dp_5f6368_fill0_wght400_grad0_opsz24,
-                "Debrief" to R.drawable.swords,
+                "DBF" to R.drawable.swords,
                 "Admin" to R.drawable.smiley,
                 "FTG" to R.drawable.fatigue,
                 "XSB" to R.drawable.phone_callback_24dp_5f6368_fill0_wght400_grad0_opsz24
             )
-
-            // Handle special activities where the route should be blank and the times adjusted
-            val specialActivities = listOf( "PCK", "OFF", "UFD", "LVE", "AOF", "EPT", "OWN", "DFD", "HTC", "XSB", "STR", "ESB",
-                "A2B", "A2H", "A2S", "A3S", "ATC", "B2A", "B2T", "G2H", "G2M", "H22", "H2A", "H2G",
-                "H2J", "H2Q", "H2S", "H2T", "H2W", "H3S", "J2H", "J2S", "M22", "M2G", "M2W", "Q2H",
-                "Q2S", "S2A", "S2H", "S2J", "S2Q", "S3A", "S3H", "SAK", "T2B", "T2H", "TCA", "TCH",
-                "W2H", "W2M", "ST7", "TRT", "ZRS", "ZRI", "ZNI", "STP", "SIM", "SB7", "ST2", "ST3",
-                "SIC", "SIA", "SB2", "CVA", "A06", "SD7", "L03", "L02", "L01", "A01", "A02", "A04",
-                "A05", "A07", "A08", "A09", "AAS", "AB1", "AB2", "AB3", "AB4", "AB5", "AB6", "AB7",
-                "AB8", "AB9", "AF1", "AF2", "AF3", "AF4", "AF5", "AF6", "AF7", "AF8", "AF9", "AFL",
-                "AT1", "AT2", "AT3", "AT4", "B02", "B05", "B06", "B07", "BAS", "BCL", "BF1", "BF2",
-                "BF3", "BF4", "BF5", "BF6", "BF7", "BF8", "BFL", "BST", "BT1", "BT2", "BT3", "BT4",
-                "CMC", "CMM", "CMP", "CPS", "CR2", "CT3", "CTC", "FF5", "FF9", "FFP", "FFS", "FSE",
-                "ILC", "IP1", "ITM", "LOT", "MPS", "PCS", "RIS", "RNV", "RTE", "RTS", "SD2", "SD3",
-                "SI1", "SI2", "SI3", "SI4", "SID", "SIT", "SR2", "SR3", "SR7", "SRV", "TVL", "EPT",
-                "EP","EPC", "FDO", "ALV", "STB", "DBF", "GA4", "GA5", "GA7", "AAG","BAG","RGD",
-                "RNG","GS","GSI","GT1","GT2","GT3","GT4","GA4","GA5","GA7","GB3","GB8","SGT","CPG",
-                "ETG","FGT","G03", "GA3", "ADM")
 
             // Duty Mapping
             val dutyMapping = mapOf(
@@ -390,7 +381,51 @@ class RosterAdapter(
             // Paxing?
             val dutyDesignator = dutyMapping[entry.dd]
 
-            if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO", "FTG").contains(entry.activity)) {
+            // Get the origin and destination time zones using the airport IATA codes
+            val origAirport = extAirports.airports.find { it.iata == entry.orig }
+            val destAirport = extAirports.airports.find { it.iata == entry.dest }
+
+            // Define the expected date format
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            dateFormat.timeZone = TimeZone.getTimeZone("UTC") // Ensure we're using UTC
+
+            // Convert ATD to local time
+            val localAtd = if (entry.atd != null && origAirport != null) {
+                try {
+                    entry.atd?.let {
+                        dateFormat.parse(it)?.let { parsedDate ->
+                            extAirports.convertToLocalTime(parsedDate, origAirport.timeZone)
+                        }
+                    } ?: "N/A"
+                } catch (e: Exception) {
+                    Log.e("RosterAdapter", "Error parsing ATD: ${entry.atd}", e)
+                    "N/A"
+                }
+            } else {
+                "N/A"
+            }
+
+            // Convert ATA to local time
+            val localAta = if (entry.ata != null && destAirport != null) {
+                try {
+                    entry.ata?.let {
+                        dateFormat.parse(it)?.let { parsedDate ->
+                            extAirports.convertToLocalTime(parsedDate, destAirport.timeZone)
+                        }
+                    } ?: "N/A"
+                } catch (e: Exception) {
+                    Log.e("RosterAdapter", "Error parsing ATA: ${entry.ata}", e)
+                    "N/A"
+                }
+            } else {
+                "N/A"
+            }
+
+            // Set the converted times in the text view
+            flightTimesTextView.text = "$localAtd - $localAta"
+
+            // Format the Roster Duties
+            if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO", "FTG", "STR").contains(entry.activity)) {
 
                 // Move flightRouteTextView down by 8 pixels
                 val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
@@ -402,7 +437,7 @@ class RosterAdapter(
                 flightRouteTextView.layoutParams = layoutParams
 
                 // Set specific behavior for "Sign on" activity
-                flightRouteTextView.text = entry.activity
+                flightRouteTextView.text = activityMapping[entry.activity]
                 flightDataTextView.text = ""  // Clear any other activity details
                 flightTimesTextView.text = ""
 
@@ -414,6 +449,35 @@ class RosterAdapter(
                 }
 
                 flightDataTextView.isGone = true
+
+            // ------------- HANDLE DUTIES REQUIRE TIMES BUT ONLY ONE LINE ---------------------
+            } else if (listOf("STR", "STB", "DBF", "ADM").contains(entry.activity)) {
+
+                flightRouteTextView.text = activityMapping[entry.activity]
+                flightDataTextView.text = ""
+
+                // Handle duty timings (ata, atd)
+                val atd = formatTime(entry.atd)
+                val ata = formatTime(entry.ata)
+                flightTimesTextView.text = "$atd - $ata"
+
+                iconMapping[entry.activity]?.let {
+                    flightIcon.setImageResource(it)
+                } ?: run {
+                    // Fallback option if no matching icon is found
+                    flightIcon.setImageResource(R.drawable.house) // Replace with your default icon
+                }
+
+                flightDataTextView.isGone = true
+
+                // Move the flightRouteTextView down by 8 pixels
+                val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutFlight = flightTimesTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutIcon = flightIcon.layoutParams as ViewGroup.MarginLayoutParams
+
+                layoutIcon.topMargin = 18
+                layoutParams.topMargin = 20
+                layoutFlight.topMargin = 15
 
             // ------------- HANDLE PICKUP AND TRANSPORT DUTIES -------------------------
             } else if (listOf("PCK", "HTC","A2B", "A2H", "A2S", "A3S", "ATC", "B2A", "B2T", "G2H", "G2M", "H22", "H2A", "H2G",
@@ -515,14 +579,14 @@ class RosterAdapter(
 
                 layoutIcon.topMargin = 28
                 layoutParams.topMargin = 0
-                layoutFlight.topMargin = 12
+                layoutFlight.topMargin = 8
 
                 flightDataTextView.isGone = false
 
                 // Handle duty timings (ata, atd)
                 val atd = formatTime(entry.atd)
                 val ata = formatTime(entry.ata)
-                flightTimesTextView.text = "$atd - $ata"
+                flightTimesTextView.text = "$localAtd - $localAta"
 
                 // Set the appropriate icon
 

@@ -18,6 +18,7 @@ import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.*
 
+
 class FragmentRoster : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
@@ -100,14 +101,17 @@ class FragmentRoster : Fragment() {
         })
     }
 
-    // Populate the roster table
+    // Update the table
     fun updateRecyclerView(rosterData: List<DbData>) {
         // Organize roster data by date
         val entriesByDate = rosterData.groupBy { it.date }
         val sortedDates = entriesByDate.keys.sorted()
 
-        // Set up the adapter with the grouped data
-        rosterAdapter = RosterAdapter(sortedDates, entriesByDate)
+        // Create an instance of extAirports
+        val extAirportsInstance = extAirports()
+
+        // Set up the adapter with the grouped data and pass the extAirports instance
+        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance)
 
         // Set the adapter for the RecyclerView
         recyclerView.adapter = rosterAdapter
@@ -116,21 +120,25 @@ class FragmentRoster : Fragment() {
         scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
     }
 
-    // Scroll to yesterday's date. Which is actually today, but Kotlin is retarded
+
     private fun scrollToClosestDate(sortedDates: List<String>, entriesByDate: Map<String, List<DbData>>, recyclerView: RecyclerView) {
-        val calendar = Calendar.getInstance()
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         calendar.time = Date()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
         calendar.add(Calendar.DAY_OF_YEAR, -1) // Subtract one day
         val yesterday = calendar.time
 
         // Standard formatter
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        dateFormatter.timeZone = TimeZone.getTimeZone("UTC") // Ensure we're using UTC
 
         var closestDateIndex: Int? = null
         var smallestTimeInterval: Long = Long.MAX_VALUE
         var currentIndex = 0 // Keeps track of the overall index (date header + duties)
 
-        // Loop through sortedDates and calculate the index
         for (i in sortedDates.indices) {
             val dateString = sortedDates[i]
             val parsedDate = dateFormatter.parse(dateString)
@@ -138,18 +146,14 @@ class FragmentRoster : Fragment() {
             parsedDate?.let {
                 val timeInterval = it.time - yesterday.time
 
-                // Check if this date is closer to yesterday
                 if (Math.abs(timeInterval) < smallestTimeInterval) {
                     smallestTimeInterval = Math.abs(timeInterval)
                     closestDateIndex = currentIndex
                 }
             }
 
-            // Add 1 for the date header
-            currentIndex++
-
-            // Add the number of duties for this date to currentIndex
-            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0
+            currentIndex++  // Add 1 for the date header
+            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0 // Add the number of duties for this date
         }
 
         // Scroll to the closest date index if found
@@ -157,6 +161,7 @@ class FragmentRoster : Fragment() {
             recyclerView.scrollToPosition(it)
         }
     }
+
 
     // Create the signon duties out of nothing.  Boss.
     private fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
@@ -211,21 +216,27 @@ class FragmentRoster : Fragment() {
         return updatedEntries
     }
 
-    // Helper function to parse date string into Date object
+    // Helper function to parse date string into Date object in UTC
     private fun parseDate(dateString: String): Date? {
         return try {
-            val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("UTC") // Ensure it's parsed as UTC
+            }
             dateFormatter.parse(dateString)
         } catch (e: Exception) {
             null
         }
     }
 
-    // Helper function to format Date object into string (yyyy-MM-dd HH:mm:ss)
+
+    // Helper function to format Date object into string in UTC (yyyy-MM-dd HH:mm:ss)
     private fun formatDate(date: Date?): String {
         return date?.let {
-            val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("UTC") // Ensure it's formatted in UTC
+            }
             dateFormatter.format(date)
         } ?: ""
     }
+
 }
