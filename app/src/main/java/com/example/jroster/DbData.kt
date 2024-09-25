@@ -1,10 +1,12 @@
 package com.example.jroster
 
-import java.util.Date
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
+@Entity(tableName = "DbData")
 data class DbData(
+    @PrimaryKey val date: String, // Marking date as the primary key
     val dd: String?,
-    val date: String,
     val activity: String,
     val checkIn: String,
     val orig: String,
@@ -14,3 +16,4 @@ data class DbData(
     val checkOut: String,
     val ac: String
 )
+
