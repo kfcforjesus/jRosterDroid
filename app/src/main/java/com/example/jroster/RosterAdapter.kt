@@ -2,6 +2,7 @@ package com.example.jroster
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -125,31 +126,29 @@ class RosterAdapter(
     class DateViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val dateTextView: TextView = itemView.findViewById(R.id.rosterDate)
 
-
         // Modify the bind function to properly format and display the date based on ATD
         fun bind(atd: String?, extAirports: extAirports, useHomeTime: Boolean, userBase: String, origIata: String) {
-            // Step 1: Parse the ATD string from MySQL
-
+            // Parse the ATD string from MySQL
             val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
                 timeZone = TimeZone.getTimeZone("UTC") // Assuming ATD is stored in UTC in MySQL
             }
             val atdDate: Date? = atd?.let { dateFormat.parse(it) }
 
-            // Step 2: Determine the time zone (either home time or origin airport time zone)
+            //  Determine the time zone (either home time or origin airport time zone)
             val origAirport = extAirports.airports.find { it.iata == origIata }
             val timeZoneForATD = if (useHomeTime) {
-                TimeZone.getTimeZone( "Australia/Melbourne")
+                TimeZone.getTimeZone("Australia/Melbourne")
             } else {
                 TimeZone.getTimeZone(origAirport?.timeZone ?: "UTC")
             }
 
-            // Step 3: Convert ATD to local time
+            // Convert ATD to local time
             val localDateFormat = SimpleDateFormat("EEE dd MMM yyyy", Locale.getDefault()).apply {
                 timeZone = timeZoneForATD
             }
             val localDate = atdDate?.let { localDateFormat.format(it) } ?: "Invalid Date"
 
-            // Step 4: Get today's date in local time for comparison
+            // Get today's date in local time for comparison
             val today = Calendar.getInstance(timeZoneForATD).apply {
                 set(Calendar.HOUR_OF_DAY, 0)
                 set(Calendar.MINUTE, 0)
@@ -157,17 +156,24 @@ class RosterAdapter(
                 set(Calendar.MILLISECOND, 0)
             }.time
 
-            // Step 5: Check if the local ATD is today
+            // Check if the local ATD is today or in the past
+            val isPastDate = atdDate?.before(today) == true
+
+            // Set text color based on whether the date is in the past
+            dateTextView.setTextColor(if (isPastDate) Color.GRAY else Color.parseColor("#3F51B5")) // Indigo for future/today, grey for past
+
+            // Check if the local ATD is today and adjust the display text accordingly
             val finalDateText = if (atdDate != null && atdDate.time >= today.time && atdDate.time < today.time + 24 * 60 * 60 * 1000) {
                 "$localDate (Today)"
             } else {
                 localDate
             }
 
-            // Step 6: Set the formatted local date text to the TextView
+            // Set the formatted local date text to the TextView
             dateTextView.text = finalDateText
         }
     }
+
 
 
     // Handle Duty display on the table
@@ -443,6 +449,26 @@ class RosterAdapter(
             } else {
                 destAirport?.timeZone?.let { TimeZone.getTimeZone(it) } ?: TimeZone.getDefault()
             }
+
+            // Get today's date in the same time zone
+            val today = Calendar.getInstance(timeZoneForATD).apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.time
+
+            // Return the date
+            val atdDate: Date? = entry.atd?.let { dateFormat.parse(it) }
+
+            // Check if the ATD is in the past
+            val isPastDate = atdDate?.before(today) ?: false
+
+            // Set the text color based on whether the duty is in the past
+            val textColor = if (isPastDate) Color.GRAY else Color.BLACK
+            flightRouteTextView.setTextColor(textColor)
+            flightDataTextView.setTextColor(textColor)
+            flightTimesTextView.setTextColor(textColor)
 
             // Convert ATD to selected time zone (local or Sydney)
             val localAtd = if (entry.atd != null && origAirport != null) {
