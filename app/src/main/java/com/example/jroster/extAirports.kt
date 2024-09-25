@@ -57,7 +57,6 @@ class extAirports {
         }
     }
 
-
     // Data
     val airports = listOf(
         Airport(name = "", iata = "UTC", icao = "GMT", latLong = "0,0", elevation = "0", utcVariation = "UTC +0", timeZone = "UTC"),

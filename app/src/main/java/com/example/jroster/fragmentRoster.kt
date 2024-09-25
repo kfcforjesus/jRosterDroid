@@ -12,62 +12,96 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.*
 
-
 class FragmentRoster : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var rosterAdapter: RosterAdapter
 
+    var shouldScrollToClosestDate = true
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Inflate the layout for this fragment
         val view = inflater.inflate(R.layout.fragment_roster, container, false)
 
         // Initialize RecyclerView
         recyclerView = view.findViewById(R.id.rosterRecyclerView)
 
-        // Create a divider so i can see where shit is
+        // Divider
         val dividerDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.divider)
-        val dividerItemDecordation = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
-
-        dividerDrawable?.let {
-            dividerItemDecordation.setDrawable(it)
-        }
-
-        recyclerView.addItemDecoration(dividerItemDecordation)
+        val dividerItemDecoration = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
+        dividerDrawable?.let { dividerItemDecoration.setDrawable(it) }
+        recyclerView.addItemDecoration(dividerItemDecoration)
 
         // Set the LayoutManager for the RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         // Fetch userID and passCode from SharedPreferences
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
-
-        // Retrieve userID and passCode as integers
-        val userID = sharedPreferences.getString("userID", "123") // Default to 123 if not found.. Itll throw an error
+        val userID = sharedPreferences.getString("userID", "123")
         val passCode = sharedPreferences.getString("passCode", "456")
 
-        val recyclerView = view.findViewById<RecyclerView>(R.id.rosterRecyclerView)
-        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        // Users home base
+        val savedBase = sharedPreferences.getString("base", "Melbourne")
 
-        // Add a divider between items
-        val dividerItemDecoration = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
-        recyclerView.addItemDecoration(dividerItemDecoration)
+        // Retrieve saved switch state
+        val switchState = sharedPreferences.getBoolean("switch_state", false)
 
-        // Fetch the roster data
-        fetchRosterData(userID.toString(), passCode.toString())
+        // Find and set the initial switch state
+        val switchSegmentedControl: ZiresSwitchSegmentedControl = view.findViewById(R.id.zires_switch)
+        switchSegmentedControl.setChecked(switchState)
+
+        // Display users base
+        switchSegmentedControl.setRightToggleText(savedBase!!)
+
+        // Capture scroll position and offset
+        val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+
+        // Set listener to handle switch toggle
+        switchSegmentedControl.setOnToggleSwitchChangeListener(object : ZiresSwitchSegmentedControl.OnSwitchChangeListener {
+            override fun onToggleSwitchChangeListener(isChecked: Boolean) {
+                val correctedState = !isChecked
+
+                // Save the corrected state to SharedPreferences
+                sharedPreferences.edit().putBoolean("switch_state", correctedState).apply()
+
+                // Capture the current scroll position and offset
+                val currentPosition = layoutManager.findFirstVisibleItemPosition()
+                val view = layoutManager.findViewByPosition(currentPosition)
+                val offset = view?.top ?: 0
+
+                // Update the adapter's time zone state
+                rosterAdapter.useHomeTime = correctedState
+
+                // Notify only the visible items of the change without resetting the entire view
+                val visibleItemCount = layoutManager.childCount
+                val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+
+                // Notify only the range of visible items
+                rosterAdapter.notifyItemRangeChanged(firstVisibleItemPosition, visibleItemCount)
+
+                // Restore the scroll position and offset
+                recyclerView.post {
+                    layoutManager.scrollToPositionWithOffset(currentPosition, offset)
+                }
+            }
+        })
+
+        // Fetch the roster data initially
+        fetchRosterData(userID.toString(), passCode.toString(), switchState)
 
         return view
     }
 
-    fun fetchRosterData(userID: String, passCode: String) {
+    fun fetchRosterData(userID: String, passCode: String, useHomeTime: Boolean) {
         // Prepare the API call
         val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
 
@@ -79,11 +113,10 @@ class FragmentRoster : Fragment() {
 
                     // Check if rosterData is not null and show the number of records
                     rosterData?.let {
-                        val recordCount = it.size
-
                         val updatedRosterEntries = processEntriesForSignOn(it)
-                        updateRecyclerView(updatedRosterEntries)
 
+                        // Pass the switch state (useSydneyTimeZone) to updateRecyclerView
+                        updateRecyclerView(updatedRosterEntries, useHomeTime)
                     } ?: run {
                         // Show a Toast if there are no records
                         Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
@@ -101,8 +134,7 @@ class FragmentRoster : Fragment() {
         })
     }
 
-    // Update the table
-    fun updateRecyclerView(rosterData: List<DbData>) {
+    fun updateRecyclerView(rosterData: List<DbData>, useHomeTime: Boolean) {
         // Organize roster data by date
         val entriesByDate = rosterData.groupBy { it.date }
         val sortedDates = entriesByDate.keys.sorted()
@@ -110,14 +142,20 @@ class FragmentRoster : Fragment() {
         // Create an instance of extAirports
         val extAirportsInstance = extAirports()
 
-        // Set up the adapter with the grouped data and pass the extAirports instance
-        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance)
+        // Retrieve the saved base value from SharedPreferences
+        val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+        val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
+
+        // Set up the adapter with the grouped data, extAirports instance, switch state, and the user's base
+        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase)
 
         // Set the adapter for the RecyclerView
         recyclerView.adapter = rosterAdapter
 
-        // Scroll to the date closest to today
-        scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
+        // Conditionally scroll to the closest date
+        if (shouldScrollToClosestDate) {
+            scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
+        }
     }
 
 
@@ -133,7 +171,7 @@ class FragmentRoster : Fragment() {
 
         // Standard formatter
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        dateFormatter.timeZone = TimeZone.getTimeZone("UTC") // Ensure we're using UTC
+        dateFormatter.timeZone = TimeZone.getTimeZone("UTC")
 
         var closestDateIndex: Int? = null
         var smallestTimeInterval: Long = Long.MAX_VALUE
@@ -181,7 +219,7 @@ class FragmentRoster : Fragment() {
 
             // Check for WDO-related activities and skip adding a "Sign on" for them
             if (listOf("WDO", "WDA", "WDT", "WDE").contains(entry.activity)) {
-                continue // Skip adding this entry
+                continue // No sign on required for this
             }
 
             // Check if check-in is after the cutoff date (January 1, 1980)
@@ -220,7 +258,7 @@ class FragmentRoster : Fragment() {
     private fun parseDate(dateString: String): Date? {
         return try {
             val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
-                timeZone = TimeZone.getTimeZone("UTC") // Ensure it's parsed as UTC
+                timeZone = TimeZone.getTimeZone("UTC")
             }
             dateFormatter.parse(dateString)
         } catch (e: Exception) {
@@ -228,15 +266,13 @@ class FragmentRoster : Fragment() {
         }
     }
 
-
     // Helper function to format Date object into string in UTC (yyyy-MM-dd HH:mm:ss)
     private fun formatDate(date: Date?): String {
         return date?.let {
             val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
-                timeZone = TimeZone.getTimeZone("UTC") // Ensure it's formatted in UTC
+                timeZone = TimeZone.getTimeZone("UTC")
             }
             dateFormatter.format(date)
         } ?: ""
     }
-
 }

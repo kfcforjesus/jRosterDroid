@@ -1,12 +1,14 @@
 package com.example.jroster
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.view.isGone
 import androidx.recyclerview.widget.RecyclerView
 import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
@@ -20,7 +22,8 @@ class RosterAdapter(
     private val sortedDates: List<String>,
     private val entriesByDate: Map<String, List<DbData>>,
     private val extAirports: extAirports,
-    var useHomeTime: Boolean
+    var useHomeTime: Boolean,
+    private val userBase: String
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val VIEW_TYPE_DATE_HEADER = 0
@@ -48,22 +51,8 @@ class RosterAdapter(
         } else if (holder is RosterEntryViewHolder) {
             val entry = getEntryForPosition(position)
             entry?.let {
-                holder.bind(it, extAirports, ::formatTime, useHomeTime) // Pass the switch state to bind
+                holder.bind(it, extAirports, ::formatTime, useHomeTime, userBase) // Pass the switch state to bind
             }
-        }
-    }
-
-
-    // Function to format date (2024-12-18 -> Tue 24 Sep 2024)
-    fun formatDate(date: String): String {
-        return try {
-            val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val outputFormat = SimpleDateFormat("EEE dd MMM yyyy", Locale.getDefault())
-
-            val parsedDate = inputFormat.parse(date)
-            parsedDate?.let { outputFormat.format(it) } ?: date
-        } catch (e: Exception) {
-            date
         }
     }
 
@@ -169,7 +158,7 @@ class RosterAdapter(
         private val flightTimesTextView: TextView = itemView.findViewById(R.id.flightTimes)
 
         @SuppressLint("SetTextI18n")
-        fun bind(entry: DbData, extAirports: extAirports, formatTime: (String?) -> String, useHomeTime: Boolean) {
+        fun bind(entry: DbData, extAirports: extAirports, formatTime: (String?) -> String, useHomeTime: Boolean, userBase: String) {
             // Special mapping of activities for customization
 
             val activityMapping = mapOf(
@@ -380,6 +369,23 @@ class RosterAdapter(
                 "" to " "
             )
 
+            // Home base mapping
+            val baseMapping = listOf(
+                "Sydney" to "Australia/Sydney",
+                "Melbourne" to "Australia/Melbourne",
+                "Brisbane" to "Australia/Brisbane",
+                "Cairns" to "Australia/Brisbane",
+                "Gold Coast" to "Australia/Brisbane",
+                "Adelaide" to "Australia/Adelaide",
+                "Perth" to "Australia/Perth",
+                "Avalon" to "Australia/Melbourne",
+                "SEQ" to "Australia/Brisbane",
+                "" to "Australia/Melbourne"
+            )
+
+            // Base map
+            val baseMap = baseMapping.toMap()
+
             // Paxing?
             val dutyDesignator = dutyMapping[entry.dd]
 
@@ -393,13 +399,13 @@ class RosterAdapter(
 
             // Decide which time zone to use based on switch state
             val timeZoneForATD = if (useHomeTime) {
-                TimeZone.getTimeZone("Australia/Sydney")
+                TimeZone.getTimeZone(baseMap[userBase] ?: "Australia/Melbourne")
             } else {
                 origAirport?.timeZone?.let { TimeZone.getTimeZone(it) } ?: TimeZone.getDefault()
             }
 
             val timeZoneForATA = if (useHomeTime) {
-                TimeZone.getTimeZone("Australia/Sydney")
+                TimeZone.getTimeZone(baseMap[userBase] ?: "Australia/Melbourne")
             } else {
                 destAirport?.timeZone?.let { TimeZone.getTimeZone(it) } ?: TimeZone.getDefault()
             }
@@ -517,9 +523,6 @@ class RosterAdapter(
                 layoutParams.topMargin = 20
                 layoutFlight.topMargin = 15
 
-
-
-
             // ------------- HANDLE SIM DUTIES -------------------------
             } else if (listOf("SIC", "SIA", "SB2", "CVA", "A06", "SD7", "L03", "L02", "L01", "A01", "A02", "A04",
                 "A05", "A07", "A08", "A09", "AAS", "AB1", "AB2", "AB3", "AB4", "AB5", "AB6", "AB7",
@@ -582,6 +585,8 @@ class RosterAdapter(
                 val activityText = activityMapping[entry.activity] ?: entry.activity
                 val extraString = "- ${dutyDesignator}"
 
+
+
                 flightRouteTextView.text = "${entry.orig} - ${entry.dest}"
 
                 // Reset top margin for non-"Sign On" duties
@@ -601,11 +606,6 @@ class RosterAdapter(
                 flightTimesTextView.text = "$localAtd - $localAta"
 
                 // Set the appropriate icon
-
-                if (dutyDesignator != null) {
-                    Log.d("Cunt2", dutyDesignator)
-                }
-
                 if (dutyDesignator == "(Paxing)" || dutyDesignator == "(Deadhead)") {
                     flightIcon.setImageResource(R.drawable.paxing)
                     flightDataTextView.text = "${activityText} ${extraString}"
