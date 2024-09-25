@@ -24,7 +24,8 @@ class RosterAdapter(
     private val entriesByDate: Map<String, List<DbData>>,
     private val extAirports: extAirports,
     var useHomeTime: Boolean,
-    private val userBase: String
+    private val userBase: String,
+    private val wdoDates: Set<String>
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val VIEW_TYPE_DATE_HEADER = 0
@@ -49,16 +50,11 @@ class RosterAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is DateViewHolder) {
             val date = getDateForPosition(position)
-            // Retrieve the first entry's ATD for that date
             val firstEntry = entriesByDate[date]?.firstOrNull()
+
             firstEntry?.let {
-                holder.bind(
-                    it.atd, // Use the ATD from the first entry for that date
-                    extAirports, // Pass the extAirports instance
-                    useHomeTime, // Pass whether to use home time
-                    userBase, // Pass the user's base
-                    it.orig // Pass the origin IATA code
-                )
+                val isWdoDate = wdoDates.contains(date) // Check if the date is in WDO dates
+                holder.bind(it.atd, extAirports, useHomeTime, userBase, it.orig, isWdoDate) // Pass the WDO status
             }
         } else if (holder is RosterEntryViewHolder) {
             val entry = getEntryForPosition(position)
@@ -125,16 +121,24 @@ class RosterAdapter(
     // Handle date display on the Table
     class DateViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val dateTextView: TextView = itemView.findViewById(R.id.rosterDate)
+        private val wdoTextView: TextView = itemView.findViewById(R.id.wdoTextView) // TextView for "WDO" indicator
 
         // Modify the bind function to properly format and display the date based on ATD
-        fun bind(atd: String?, extAirports: extAirports, useHomeTime: Boolean, userBase: String, origIata: String) {
+        fun bind(
+            atd: String?,
+            extAirports: extAirports,
+            useHomeTime: Boolean,
+            userBase: String,
+            origIata: String,
+            isWdoDate: Boolean // Include WDO status to allow for different formatting if necessary
+        ) {
             // Parse the ATD string from MySQL
             val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
                 timeZone = TimeZone.getTimeZone("UTC") // Assuming ATD is stored in UTC in MySQL
             }
             val atdDate: Date? = atd?.let { dateFormat.parse(it) }
 
-            //  Determine the time zone (either home time or origin airport time zone)
+            // Determine the time zone (either home time or origin airport time zone)
             val origAirport = extAirports.airports.find { it.iata == origIata }
             val timeZoneForATD = if (useHomeTime) {
                 TimeZone.getTimeZone("Australia/Melbourne")
@@ -159,8 +163,13 @@ class RosterAdapter(
             // Check if the local ATD is today or in the past
             val isPastDate = atdDate?.before(today) == true
 
-            // Set text color based on whether the date is in the past
-            dateTextView.setTextColor(if (isPastDate) Color.GRAY else Color.parseColor("#3F51B5")) // Indigo for future/today, grey for past
+            // Set text color based on whether the date is in the past (maintain previous functionality)
+            dateTextView.setTextColor(
+                when {
+                    isPastDate -> Color.GRAY // Use light gray for past dates
+                    else -> Color.parseColor("#3F51B5") // Indigo for future/today
+                }
+            )
 
             // Check if the local ATD is today and adjust the display text accordingly
             val finalDateText = if (atdDate != null && atdDate.time >= today.time && atdDate.time < today.time + 24 * 60 * 60 * 1000) {
@@ -171,6 +180,9 @@ class RosterAdapter(
 
             // Set the formatted local date text to the TextView
             dateTextView.text = finalDateText
+
+            // Set "WDO" in the wdoTextView if isWdoDate is true, otherwise set it to an empty string
+            wdoTextView.text = if (isWdoDate) "WDO" else ""
         }
     }
 
@@ -602,6 +614,12 @@ class RosterAdapter(
                 "SI1", "SI2", "SI3", "SI4", "SID", "SIT", "SR2", "SR3", "SR7", "SRV", "ST2", "ST3",
                 "ST7", "TRT", "ZRS", "ZRI", "ZNI", "STP", "SIM", "SB7", "ALV", "A03").contains(entry.activity)) {
 
+                var timeText = ""
+
+                if (!useHomeTime)  {
+                    timeText = "L"
+                }
+
                 // Handle other activities based on mapping
                 val activityText = activityMapping[entry.activity] ?: entry.activity
                 flightRouteTextView.text = "Sim"
@@ -619,7 +637,7 @@ class RosterAdapter(
                 flightDataTextView.isGone = false
 
                 // Handle duty timings (ata, atd)
-                flightTimesTextView.text = "$localAtd - $localAta"
+                flightTimesTextView.text = "$localAtd$timeText - $localAta$timeText"
 
                 // Set the appropriate icon
                 val iconRes = iconMapping[activityText] ?: R.drawable.sim2 // Default airplane icon

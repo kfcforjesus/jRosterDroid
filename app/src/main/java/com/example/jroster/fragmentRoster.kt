@@ -23,6 +23,7 @@ class FragmentRoster : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var rosterAdapter: RosterAdapter
+    private val wdoDates: MutableSet<String> = mutableSetOf()
 
     var shouldScrollToClosestDate = true
 
@@ -147,7 +148,7 @@ class FragmentRoster : Fragment() {
         val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
 
         // Set up the adapter with the grouped data, extAirports instance, switch state, and the user's base
-        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase)
+        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
 
         // Set the adapter for the RecyclerView
         recyclerView.adapter = rosterAdapter
@@ -166,7 +167,7 @@ class FragmentRoster : Fragment() {
         calendar.set(Calendar.MINUTE, 0)
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
-        calendar.add(Calendar.DAY_OF_YEAR, -1) // Subtract one day
+        calendar.add(Calendar.DAY_OF_YEAR, 0) // Subtract one day
         val yesterday = calendar.time
 
         // Standard formatter
@@ -218,7 +219,10 @@ class FragmentRoster : Fragment() {
 
             // Check for WDO-related activities and skip adding a "Sign on" for them
             if (listOf("WDO", "WDA", "WDT", "WDE").contains(entry.activity)) {
-                continue // No sign on required for this
+                wdoDates.add(entry.date)
+
+                // Skip
+                continue
             }
 
             // Check if check-in is after the cutoff date (January 1, 1980)
