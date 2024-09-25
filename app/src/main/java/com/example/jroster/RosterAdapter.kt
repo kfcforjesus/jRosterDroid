@@ -1,7 +1,6 @@
 package com.example.jroster
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
@@ -9,10 +8,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.view.isGone
 import androidx.recyclerview.widget.RecyclerView
-import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -712,15 +709,6 @@ class RosterAdapter(
                 }
 
             }
-
-            /*if (specialActivities.contains(entry.activity)) {
-                val activityText = activityMapping[entry.activity] ?: entry.activity
-                flightRouteTextView.text = activityText // Adjust route for special activities
-                flightTimesTextView.text = formatTime(entry.atd)
-
-                // Optionally, adjust the icon for special activities
-                flightIcon.setImageResource(iconMapping[activityText] ?: R.drawable.plane)
-            }*/
         }
     }
 }

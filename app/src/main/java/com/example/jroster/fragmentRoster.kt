@@ -2,7 +2,6 @@ package com.example.jroster
 
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +12,9 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -96,28 +98,76 @@ class FragmentRoster : Fragment() {
             }
         })
 
-        // Fetch the roster data initially
-        fetchRosterData(userID.toString(), passCode.toString(), switchState)
+        // Fetch and display data from the database first
+        CoroutineScope(Dispatchers.IO).launch {
+            val db = AppDatabase.getInstance(requireContext())
+            val rosterEntriesFromDb = db.dbDataDao().getAll()
+
+            // Process entries for Sign On
+            val processedEntries = processEntriesForSignOn(rosterEntriesFromDb)
+
+            // Update the UI on the main thread
+            CoroutineScope(Dispatchers.Main).launch {
+                updateRecyclerView(processedEntries, switchState)
+            }
+
+            // Then fetch new data from the network
+            fetchRosterData(userID.toString(), passCode.toString(), switchState)
+        }
 
         return view
     }
 
+    // Fetch roster data from MySQL
     fun fetchRosterData(userID: String, passCode: String, useHomeTime: Boolean) {
-        // Prepare the API call
+        // Prepare API call
         val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
 
-        // Enqueue the API call
+        // Queue the API call
         call.enqueue(object : Callback<List<DbData>> {
             override fun onResponse(call: Call<List<DbData>>, response: Response<List<DbData>>) {
                 if (response.isSuccessful) {
                     val rosterData = response.body()
 
-                    // Check if rosterData is not null and show the number of records
-                    rosterData?.let {
-                        val updatedRosterEntries = processEntriesForSignOn(it)
+                    // Check if rosterData is not null
+                    rosterData?.let { data ->
+                        val updatedRosterEntries = data.map { entry ->
+                            // Unix epoch for null
+                            val unixEpoch = "1970-01-01 00:00:00"
+                            val defaultAc = "320"
 
-                        // Pass the switch state (useSydneyTimeZone) to updateRecyclerView
-                        updateRecyclerView(updatedRosterEntries, useHomeTime)
+                            DbData(
+                                dd = entry.dd,
+                                date = entry.date,
+                                activity = entry.activity,
+                                checkIn = entry.checkIn ?: unixEpoch,
+                                orig = entry.orig,
+                                atd = entry.atd ?: unixEpoch,
+                                dest = entry.dest,
+                                ata = entry.ata ?: unixEpoch,
+                                checkOut = entry.checkOut ?: unixEpoch,
+                                ac = entry.ac ?: defaultAc
+                            )
+                        }
+
+                        // Insert the processed data into the Room database after clearing it
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val db = AppDatabase.getInstance(requireContext())
+
+                            // Clear the database before inserting the new data
+                            db.dbDataDao().deleteAll()
+
+                            // Insert all new entries into the database
+                            db.dbDataDao().insertAll(updatedRosterEntries)
+
+                            // Process entries for Sign On before updating the UI
+                            val processedEntries = processEntriesForSignOn(updatedRosterEntries)
+
+                            // Update the UI on the main thread
+                            CoroutineScope(Dispatchers.Main).launch {
+                                updateRecyclerView(processedEntries, useHomeTime)
+                            }
+                        }
                     } ?: run {
                         // Show a Toast if there are no records
                         Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
@@ -135,74 +185,8 @@ class FragmentRoster : Fragment() {
         })
     }
 
-    fun updateRecyclerView(rosterData: List<DbData>, useHomeTime: Boolean) {
-        // Organize roster data by date
-        val entriesByDate = rosterData.groupBy { it.date }
-        val sortedDates = entriesByDate.keys.sorted()
-
-        // Create an instance of extAirports
-        val extAirportsInstance = extAirports()
-
-        // Retrieve the saved base value from SharedPreferences
-        val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
-        val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
-
-        // Set up the adapter with the grouped data, extAirports instance, switch state, and the user's base
-        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
-
-        // Set the adapter for the RecyclerView
-        recyclerView.adapter = rosterAdapter
-
-        // Conditionally scroll to the closest date
-        if (shouldScrollToClosestDate) {
-            scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
-        }
-    }
-
-
-    private fun scrollToClosestDate(sortedDates: List<String>, entriesByDate: Map<String, List<DbData>>, recyclerView: RecyclerView) {
-        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-        calendar.time = Date()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        calendar.add(Calendar.DAY_OF_YEAR, 0) // Subtract one day
-        val yesterday = calendar.time
-
-        // Standard formatter
-        val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        dateFormatter.timeZone = TimeZone.getTimeZone("UTC")
-
-        var closestDateIndex: Int? = null
-        var smallestTimeInterval: Long = Long.MAX_VALUE
-        var currentIndex = 0 // Keeps track of the overall index (date header + duties)
-
-        for (i in sortedDates.indices) {
-            val dateString = sortedDates[i]
-            val parsedDate = dateFormatter.parse(dateString)
-
-            parsedDate?.let {
-                val timeInterval = it.time - yesterday.time
-
-                if (Math.abs(timeInterval) < smallestTimeInterval) {
-                    smallestTimeInterval = Math.abs(timeInterval)
-                    closestDateIndex = currentIndex
-                }
-            }
-
-            currentIndex++  // Add 1 for the date header
-            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0 // Add the number of duties for this date
-        }
-
-        // Scroll to the closest date index if found
-        closestDateIndex?.let {
-            recyclerView.scrollToPosition(it)
-        }
-    }
-
-    // Create the signon duties out of nothing.  Boss.
-    private fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
+    // Process Sign On duties
+    fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
         val updatedEntries = mutableListOf<DbData>()
         val seenCheckInTimesByDate = mutableMapOf<String, MutableSet<Date>>()
 
@@ -220,8 +204,6 @@ class FragmentRoster : Fragment() {
             // Check for WDO-related activities and skip adding a "Sign on" for them
             if (listOf("WDO", "WDA", "WDT", "WDE").contains(entry.activity)) {
                 wdoDates.add(entry.date)
-
-                // Skip
                 continue
             }
 
@@ -255,6 +237,71 @@ class FragmentRoster : Fragment() {
         }
 
         return updatedEntries
+    }
+
+    fun updateRecyclerView(rosterData: List<DbData>, useHomeTime: Boolean) {
+        // Organize roster data by date
+        val entriesByDate = rosterData.groupBy { it.date }
+        val sortedDates = entriesByDate.keys.sorted()
+
+        // Create an instance of extAirports
+        val extAirportsInstance = extAirports()
+
+        // Retrieve the saved base value from SharedPreferences
+        val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+        val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
+
+        // Set up the adapter with the grouped data
+        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
+
+        // Set the adapter for the RecyclerView
+        recyclerView.adapter = rosterAdapter
+
+        // Conditionally scroll to the closest date
+        if (shouldScrollToClosestDate) {
+            scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
+        }
+    }
+
+    private fun scrollToClosestDate(sortedDates: List<String>, entriesByDate: Map<String, List<DbData>>, recyclerView: RecyclerView) {
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        calendar.time = Date()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        calendar.add(Calendar.DAY_OF_YEAR, 0)
+        val yesterday = calendar.time
+
+        // Standard formatter
+        val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        dateFormatter.timeZone = TimeZone.getTimeZone("UTC")
+
+        var closestDateIndex: Int? = null
+        var smallestTimeInterval: Long = Long.MAX_VALUE
+        var currentIndex = 0 // Keeps track of the overall index (date header + duties)
+
+        for (i in sortedDates.indices) {
+            val dateString = sortedDates[i]
+            val parsedDate = dateFormatter.parse(dateString)
+
+            parsedDate?.let {
+                val timeInterval = it.time - yesterday.time
+
+                if (Math.abs(timeInterval) < smallestTimeInterval) {
+                    smallestTimeInterval = Math.abs(timeInterval)
+                    closestDateIndex = currentIndex
+                }
+            }
+
+            currentIndex++  // Add 1 for the date header
+            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0 // Add the number of duties for this date
+        }
+
+        // Scroll to the closest date index if found
+        closestDateIndex?.let {
+            recyclerView.scrollToPosition(it)
+        }
     }
 
     // Helper function to parse date string into Date object in UTC
