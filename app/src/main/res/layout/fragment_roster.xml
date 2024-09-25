@@ -43,17 +43,6 @@
         app:layout_constraintTop_toBottomOf="@id/rosterTitle"
         tools:listitem="@layout/duty_row_layout" />
 
-    <!--<Switch
-        android:id="@+id/switch1"
-        android:layout_width="130dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:layout_marginEnd="16dp"
-        android:text="Local Time"
-        app:layout_constraintBottom_toTopOf="@+id/view"
-        app:layout_constraintEnd_toEndOf="@+id/view"
-        app:layout_constraintTop_toTopOf="parent" />-->
-
     <com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
         android:id="@+id/zires_switch"
         android:layout_width="wrap_content"

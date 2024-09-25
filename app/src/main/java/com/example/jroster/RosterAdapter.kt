@@ -9,6 +9,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.view.isGone
 import androidx.recyclerview.widget.RecyclerView
+import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -18,7 +19,8 @@ import java.util.TimeZone
 class RosterAdapter(
     private val sortedDates: List<String>,
     private val entriesByDate: Map<String, List<DbData>>,
-    private val extAirports: extAirports
+    private val extAirports: extAirports,
+    var useHomeTime: Boolean
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val VIEW_TYPE_DATE_HEADER = 0
@@ -46,7 +48,7 @@ class RosterAdapter(
         } else if (holder is RosterEntryViewHolder) {
             val entry = getEntryForPosition(position)
             entry?.let {
-                holder.bind(it, extAirports, ::formatTime) // Pass extAirports along with formatTime
+                holder.bind(it, extAirports, ::formatTime, useHomeTime) // Pass the switch state to bind
             }
         }
     }
@@ -167,7 +169,7 @@ class RosterAdapter(
         private val flightTimesTextView: TextView = itemView.findViewById(R.id.flightTimes)
 
         @SuppressLint("SetTextI18n")
-        fun bind(entry: DbData, extAirports: extAirports, formatTime: (String?) -> String) {
+        fun bind(entry: DbData, extAirports: extAirports, formatTime: (String?) -> String, useHomeTime: Boolean) {
             // Special mapping of activities for customization
 
             val activityMapping = mapOf(
@@ -387,14 +389,27 @@ class RosterAdapter(
 
             // Define the expected date format
             val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-            dateFormat.timeZone = TimeZone.getTimeZone("UTC") // Ensure we're using UTC
+            dateFormat.timeZone = TimeZone.getTimeZone("UTC")
 
-            // Convert ATD to local time
+            // Decide which time zone to use based on switch state
+            val timeZoneForATD = if (useHomeTime) {
+                TimeZone.getTimeZone("Australia/Sydney")
+            } else {
+                origAirport?.timeZone?.let { TimeZone.getTimeZone(it) } ?: TimeZone.getDefault()
+            }
+
+            val timeZoneForATA = if (useHomeTime) {
+                TimeZone.getTimeZone("Australia/Sydney")
+            } else {
+                destAirport?.timeZone?.let { TimeZone.getTimeZone(it) } ?: TimeZone.getDefault()
+            }
+
+            // Convert ATD to selected time zone (local or Sydney)
             val localAtd = if (entry.atd != null && origAirport != null) {
                 try {
                     entry.atd?.let {
                         dateFormat.parse(it)?.let { parsedDate ->
-                            extAirports.convertToLocalTime(parsedDate, origAirport.timeZone)
+                            extAirports.convertToLocalTime(parsedDate, timeZoneForATD.id)
                         }
                     } ?: "N/A"
                 } catch (e: Exception) {
@@ -405,12 +420,12 @@ class RosterAdapter(
                 "N/A"
             }
 
-            // Convert ATA to local time
+            // Convert ATA to selected time zone (local or Sydney)
             val localAta = if (entry.ata != null && destAirport != null) {
                 try {
                     entry.ata?.let {
                         dateFormat.parse(it)?.let { parsedDate ->
-                            extAirports.convertToLocalTime(parsedDate, destAirport.timeZone)
+                            extAirports.convertToLocalTime(parsedDate, timeZoneForATA.id)
                         }
                     } ?: "N/A"
                 } catch (e: Exception) {
@@ -420,9 +435,6 @@ class RosterAdapter(
             } else {
                 "N/A"
             }
-
-            // Set the converted times in the text view
-            flightTimesTextView.text = "$localAtd - $localAta"
 
             // Format the Roster Duties
             if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO", "FTG", "STR").contains(entry.activity)) {
@@ -459,7 +471,7 @@ class RosterAdapter(
                 // Handle duty timings (ata, atd)
                 val atd = formatTime(entry.atd)
                 val ata = formatTime(entry.ata)
-                flightTimesTextView.text = "$atd - $ata"
+                flightTimesTextView.text = "$localAtd - $localAta"
 
                 iconMapping[entry.activity]?.let {
                     flightIcon.setImageResource(it)
@@ -487,7 +499,7 @@ class RosterAdapter(
 
                 flightRouteTextView.text = activityMapping[entry.activity]
                 flightDataTextView.text = ""
-                flightTimesTextView.text = formatTime(entry.atd) // Only check-in time is shown
+                flightTimesTextView.text = localAtd // Only check-in time is shown
 
                 // Set the appropriate icon
                 val iconRes = R.drawable.bus // Default airplane icon
@@ -538,7 +550,7 @@ class RosterAdapter(
                 // Handle duty timings (ata, atd)
                 val atd = formatTime(entry.atd)
                 val ata = formatTime(entry.ata)
-                flightTimesTextView.text = "$atd - $ata"
+                flightTimesTextView.text = "$localAtd - $localAta"
 
                 // Set the appropriate icon
                 val iconRes = iconMapping[activityText] ?: R.drawable.sim2 // Default airplane icon
@@ -549,7 +561,7 @@ class RosterAdapter(
             } else if (entry.activity == "Sign on") {
                 flightRouteTextView.text = "Sign On"
                 flightDataTextView.text = ""
-                flightTimesTextView.text = formatTime(entry.atd) // Only check-in time is shown
+                flightTimesTextView.text = localAtd // Only check-in time is shown
                 flightIcon.setImageResource(R.drawable.clock) // Icon for Sign On
 
                 flightDataTextView.isGone = true
