@@ -186,8 +186,6 @@ class RosterAdapter(
         }
     }
 
-
-
     // Handle Duty display on the table
     class RosterEntryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val flightIcon: ImageView = itemView.findViewById(R.id.flightIcon)
