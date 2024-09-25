@@ -47,11 +47,22 @@ class RosterAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is DateViewHolder) {
-            holder.bind(getDateForPosition(position))
+            val date = getDateForPosition(position)
+            // Retrieve the first entry's ATD for that date
+            val firstEntry = entriesByDate[date]?.firstOrNull()
+            firstEntry?.let {
+                holder.bind(
+                    it.atd, // Use the ATD from the first entry for that date
+                    extAirports, // Pass the extAirports instance
+                    useHomeTime, // Pass whether to use home time
+                    userBase, // Pass the user's base
+                    it.orig // Pass the origin IATA code
+                )
+            }
         } else if (holder is RosterEntryViewHolder) {
             val entry = getEntryForPosition(position)
             entry?.let {
-                holder.bind(it, extAirports, ::formatTime, useHomeTime, userBase) // Pass the switch state to bind
+                holder.bind(it, extAirports, ::formatTime, useHomeTime, userBase)
             }
         }
     }
@@ -78,6 +89,7 @@ class RosterAdapter(
         return sortedDates.sumOf { 1 + (entriesByDate[it]?.size ?: 0) }
     }
 
+
     private fun isPositionDateHeader(position: Int): Boolean {
         var currentPos = 0
         for (date in sortedDates) {
@@ -86,6 +98,7 @@ class RosterAdapter(
         }
         return false
     }
+
 
     private fun getDateForPosition(position: Int): String {
         var currentPos = 0
@@ -108,49 +121,56 @@ class RosterAdapter(
         return null
     }
 
+    // Handle date display on the Table
     class DateViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val dateTextView: TextView = itemView.findViewById(R.id.rosterDate)
 
-        // Modify the bind function to properly format and display the date
-        fun bind(date: String) {
-            // Date formatter for parsing the date string in UTC
-            var dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply {
-                timeZone = TimeZone.getTimeZone("UTC")
+
+        // Modify the bind function to properly format and display the date based on ATD
+        fun bind(atd: String?, extAirports: extAirports, useHomeTime: Boolean, userBase: String, origIata: String) {
+            // Step 1: Parse the ATD string from MySQL
+
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone("UTC") // Assuming ATD is stored in UTC in MySQL
             }
-            val displayedDateFormatter = SimpleDateFormat("EEE dd MMM yyyy", Locale.getDefault())
+            val atdDate: Date? = atd?.let { dateFormat.parse(it) }
 
-            // Get today's date at midnight in UTC
-            val today = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-            today.time = Date()
-            today.set(Calendar.HOUR_OF_DAY, 0)
-            today.set(Calendar.MINUTE, 0)
-            today.set(Calendar.SECOND, 0)
-            today.set(Calendar.MILLISECOND, 0)
-            val todayDate = today.time
-
-            // Parse the current date from the string
-            val parsedDate = dateFormatter.parse(date)
-
-            // Check if the parsed date is valid
-            parsedDate?.let {
-                // Format the date to display
-                var formattedDate = displayedDateFormatter.format(it)
-
-                // Check if this date is today
-                if (parsedDate == todayDate) {
-                    formattedDate += " (Today)"
-                }
-
-                // Set the formatted date text to the TextView
-                dateTextView.text = formattedDate
-            } ?: run {
-                // In case of an error with parsing, show an invalid date text
-                dateTextView.text = "Invalid Date"
+            // Step 2: Determine the time zone (either home time or origin airport time zone)
+            val origAirport = extAirports.airports.find { it.iata == origIata }
+            val timeZoneForATD = if (useHomeTime) {
+                TimeZone.getTimeZone( "Australia/Melbourne")
+            } else {
+                TimeZone.getTimeZone(origAirport?.timeZone ?: "UTC")
             }
+
+            // Step 3: Convert ATD to local time
+            val localDateFormat = SimpleDateFormat("EEE dd MMM yyyy", Locale.getDefault()).apply {
+                timeZone = timeZoneForATD
+            }
+            val localDate = atdDate?.let { localDateFormat.format(it) } ?: "Invalid Date"
+
+            // Step 4: Get today's date in local time for comparison
+            val today = Calendar.getInstance(timeZoneForATD).apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.time
+
+            // Step 5: Check if the local ATD is today
+            val finalDateText = if (atdDate != null && atdDate.time >= today.time && atdDate.time < today.time + 24 * 60 * 60 * 1000) {
+                "$localDate (Today)"
+            } else {
+                localDate
+            }
+
+            // Step 6: Set the formatted local date text to the TextView
+            dateTextView.text = finalDateText
         }
     }
 
 
+    // Handle Duty display on the table
     class RosterEntryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val flightIcon: ImageView = itemView.findViewById(R.id.flightIcon)
         private val flightRouteTextView: TextView = itemView.findViewById(R.id.flightRoute)
@@ -551,8 +571,6 @@ class RosterAdapter(
                 flightDataTextView.isGone = false
 
                 // Handle duty timings (ata, atd)
-                val atd = formatTime(entry.atd)
-                val ata = formatTime(entry.ata)
                 flightTimesTextView.text = "$localAtd - $localAta"
 
                 // Set the appropriate icon
