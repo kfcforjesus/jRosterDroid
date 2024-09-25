@@ -200,7 +200,6 @@ class FragmentRoster : Fragment() {
         }
     }
 
-
     // Create the signon duties out of nothing.  Boss.
     private fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
         val updatedEntries = mutableListOf<DbData>()

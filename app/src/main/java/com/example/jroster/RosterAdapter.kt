@@ -403,8 +403,22 @@ class RosterAdapter(
                 "" to "Australia/Melbourne"
             )
 
+            val iataMapping = listOf(
+                "Sydney" to "SYD",
+                "Melbourne" to "MEL",
+                "Brisbane" to "BNE",
+                "Cairns" to "CNS",
+                "Gold Coast" to "OOL",
+                "Adelaide" to "ADL",
+                "Perth" to "PER",
+                "Avalon" to "AVV",
+                "SEQ" to "SEQ",
+                "" to "MEL"
+            )
+
             // Base map
             val baseMap = baseMapping.toMap()
+            val iataMap = iataMapping.toMap()
 
             // Paxing?
             val dutyDesignator = dutyMapping[entry.dd]
@@ -495,8 +509,6 @@ class RosterAdapter(
                 flightDataTextView.text = ""
 
                 // Handle duty timings (ata, atd)
-                val atd = formatTime(entry.atd)
-                val ata = formatTime(entry.ata)
                 flightTimesTextView.text = "$localAtd - $localAta"
 
                 iconMapping[entry.activity]?.let {
@@ -523,9 +535,19 @@ class RosterAdapter(
                     "Q2S", "S2A", "S2H", "S2J", "S2Q", "S3A", "S3H", "SAK", "T2B", "T2H", "TCA", "TCH",
                     "W2H", "W2M").contains(entry.activity)) {
 
+                var timeText = ""
+                val localText = iataMap[userBase] ?: userBase
+
+                // Correctly access the map for `userBase`
+                if (!useHomeTime)  {
+                    timeText = " "+entry.orig
+                } else {
+                    timeText = " "+localText
+                }
+
                 flightRouteTextView.text = activityMapping[entry.activity]
                 flightDataTextView.text = ""
-                flightTimesTextView.text = localAtd // Only check-in time is shown
+                flightTimesTextView.text = localAtd+timeText // Only check-in time is shown
 
                 // Set the appropriate icon
                 val iconRes = R.drawable.bus // Default airplane icon
@@ -580,9 +602,20 @@ class RosterAdapter(
 
             // -------------- HANDLE SIGN ON ONLY --------------------------------------
             } else if (entry.activity == "Sign on") {
+
+                var timeText = ""
+                val localText = iataMap[userBase] ?: userBase
+
+                // Correctly access the map for `userBase`
+                if (!useHomeTime)  {
+                    timeText = " "+entry.orig
+                } else {
+                    timeText = " "+localText
+                }
+
                 flightRouteTextView.text = "Sign On"
                 flightDataTextView.text = ""
-                flightTimesTextView.text = localAtd // Only check-in time is shown
+                flightTimesTextView.text = localAtd+timeText // Only check-in time is shown
                 flightIcon.setImageResource(R.drawable.clock) // Icon for Sign On
 
                 flightDataTextView.isGone = true
@@ -603,7 +636,11 @@ class RosterAdapter(
                 val activityText = activityMapping[entry.activity] ?: entry.activity
                 val extraString = "- ${dutyDesignator}"
 
+                var timeText = ""
 
+                if (!useHomeTime)  {
+                    timeText = "L"
+                }
 
                 flightRouteTextView.text = "${entry.orig} - ${entry.dest}"
 
@@ -621,7 +658,7 @@ class RosterAdapter(
                 // Handle duty timings (ata, atd)
                 val atd = formatTime(entry.atd)
                 val ata = formatTime(entry.ata)
-                flightTimesTextView.text = "$localAtd - $localAta"
+                flightTimesTextView.text = "$localAtd$timeText - $localAta$timeText"
 
                 // Set the appropriate icon
                 if (dutyDesignator == "(Paxing)" || dutyDesignator == "(Deadhead)") {
