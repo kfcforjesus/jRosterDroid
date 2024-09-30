@@ -41,7 +41,7 @@ class SettingsActivity : AppCompatActivity() {
         bottomNavigationView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_friends -> {
-                    replaceFragment(fragmentFriends())
+                    replaceFragment(FragmentFriends())
                     true
                 }
                 R.id.nav_roster -> {

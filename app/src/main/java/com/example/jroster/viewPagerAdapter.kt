@@ -17,7 +17,7 @@ class ViewPagerAdapter(
     // Return the appropriate Fragment for each position
     override fun createFragment(position: Int): Fragment {
         return when (position) {
-            0 -> fragmentFriends()
+            0 -> FragmentFriends()
             1 -> FragmentRoster()
             2 -> FragmentSettings()
             else -> throw IllegalArgumentException("Invalid position")

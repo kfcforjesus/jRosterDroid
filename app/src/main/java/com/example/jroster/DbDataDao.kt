@@ -19,8 +19,4 @@ interface DbDataDao {
 
     @Query("DELETE FROM DbData")
     suspend fun clearAll()
-
-
-
-
 }

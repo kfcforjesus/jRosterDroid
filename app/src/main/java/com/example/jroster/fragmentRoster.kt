@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -15,6 +16,7 @@ import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -131,56 +133,68 @@ class FragmentRoster : Fragment() {
 
                     // Check if rosterData is not null
                     rosterData?.let { data ->
-                        val updatedRosterEntries = data.map { entry ->
-                            // Unix epoch for null
-                            val unixEpoch = "1970-01-01 00:00:00"
-                            val defaultAc = "320"
+                        // Ensure the fragment is still attached to the view and context, was crashing before.
+                        if (view != null && isAdded) {
+                            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                                val updatedRosterEntries = data.map { entry ->
+                                    // Unix epoch for null
+                                    val unixEpoch = "1970-01-01 00:00:00"
+                                    val defaultAc = "320"
 
-                            DbData(
-                                dd = entry.dd,
-                                date = entry.date,
-                                activity = entry.activity,
-                                checkIn = entry.checkIn ?: unixEpoch,
-                                orig = entry.orig,
-                                atd = entry.atd ?: unixEpoch,
-                                dest = entry.dest,
-                                ata = entry.ata ?: unixEpoch,
-                                checkOut = entry.checkOut ?: unixEpoch,
-                                ac = entry.ac ?: defaultAc
-                            )
-                        }
+                                    DbData(
+                                        dd = entry.dd,
+                                        date = entry.date,
+                                        activity = entry.activity,
+                                        checkIn = entry.checkIn ?: unixEpoch,
+                                        orig = entry.orig,
+                                        atd = entry.atd ?: unixEpoch,
+                                        dest = entry.dest,
+                                        ata = entry.ata ?: unixEpoch,
+                                        checkOut = entry.checkOut ?: unixEpoch,
+                                        ac = entry.ac ?: defaultAc
+                                    )
+                                }
 
-                        // Insert the processed data into the Room database after clearing it
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val db = AppDatabase.getInstance(requireContext())
+                                // Insert the processed data into the Room database after clearing it
+                                val db = AppDatabase.getInstance(requireContext())
 
-                            // Clear the database before inserting the new data
-                            db.dbDataDao().deleteAll()
+                                // Clear the database before inserting the new data
+                                db.dbDataDao().deleteAll()
 
-                            // Insert all new entries into the database
-                            db.dbDataDao().insertAll(updatedRosterEntries)
+                                // Insert all new entries into the database
+                                db.dbDataDao().insertAll(updatedRosterEntries)
 
-                            // Process entries for Sign On before updating the UI
-                            val processedEntries = processEntriesForSignOn(updatedRosterEntries)
+                                // Process entries for Sign On before updating the UI
+                                val processedEntries = processEntriesForSignOn(updatedRosterEntries)
 
-                            // Update the UI on the main thread
-                            CoroutineScope(Dispatchers.Main).launch {
-                                updateRecyclerView(processedEntries, useHomeTime)
+                                // Switch back to Main dispatcher for UI update
+                                withContext(Dispatchers.Main) {
+                                    // Check attachment again
+                                    if (isAdded && view != null) {
+                                        updateRecyclerView(processedEntries, useHomeTime)
+                                    }
+                                }
                             }
                         }
                     } ?: run {
-                        // Show a Toast if there are no records
-                        Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
+                        // Show a Toast if there are no records and the view is still available
+                        if (isAdded && view != null) {
+                            Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 } else {
-                    // Handle the error case
-                    Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
+                    // Handle the error case if the view is still available
+                    if (isAdded && view != null) {
+                        Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
 
             override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
-                // Show a Toast if there is a failure
-                Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                // Show a Toast if there is a failure and the view is still available
+                if (isAdded && view != null) {
+                    Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         })
     }
