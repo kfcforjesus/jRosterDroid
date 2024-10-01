@@ -15,7 +15,5 @@ data class DbData(
     val orig: String,
     val ata: String,
     val checkOut: String,
-    val ac: String
+    val ac: String?
 )
-
-

@@ -105,31 +105,19 @@ class FragmentFriends : Fragment() {
         return view
     }
 
-    // Method to handle friend selection and show the option box
-    private fun onFriendSelected() {
-        optionBox.visibility = View.VISIBLE
+    // ---------------------------------------- Adding Friends  -------------------------------------------------------------------- //
 
-        // Modify constraints
-        val constraintLayout = view?.findViewById<ConstraintLayout>(R.id.settingsLayout)
-        val constraintSet = ConstraintSet()
-        constraintSet.clone(constraintLayout)
-
-        // Connect
-        constraintSet.connect(
-            R.id.friendRecyclerView,
-            ConstraintSet.BOTTOM,
-            R.id.optionBox,
-            ConstraintSet.TOP
-        )
-
-        // Apply
-        constraintSet.applyTo(constraintLayout)
-    }
-
-    // Check internet connection and fetch friend data
+    // Step 1
     private fun checkInternetAndFetchFriend(friendCode: String) {
         if (isInternetAvailable(requireContext())) {
-            fetchFriendDataFromMySQL(friendCode)
+            if (friendCode.length == 3) {
+                fetchFriendDataFromMySQL(friendCode)
+            } else {
+                showAlertDialog(
+                    "Invalid Friend Code",
+                    "Friend Codes must be a 3-character code. Please double-check and try again."
+                )
+            }
         } else {
             showAlertDialog(
                 "No Internet Connection",
@@ -138,23 +126,23 @@ class FragmentFriends : Fragment() {
         }
     }
 
-    // Fetch friend data from MySQL
+    // Step 2 - After fetching the friend's details, fetch their flights
     private fun fetchFriendDataFromMySQL(friendCode: String) {
-        Log.d("FriendDataDebug", "Fetching friend data for code: $friendCode")
 
-        // Make sure we now expect a list of Friend objects
         val call = RetrofitClient.friendApiService.getFriendData(friendCode)
 
         call.enqueue(object : Callback<List<Friend>> {
             override fun onResponse(call: Call<List<Friend>>, response: Response<List<Friend>>) {
-
                 if (response.isSuccessful) {
                     val friendDataList = response.body()
 
                     if (friendDataList != null && friendDataList.isNotEmpty()) {
-                        // Handle each friend in the list
                         for (friend in friendDataList) {
+                            // Insert friend details into the database
                             insertFriendIntoDatabase(friend)
+
+                            // Fetch and insert the friend's flights using userID and friendCode
+                            fetchFriendFlightsFromMySQL(friend.userID, friend.friendCode)
                         }
                     } else {
                         Toast.makeText(requireContext(), "No friend data found for this code", Toast.LENGTH_SHORT).show()
@@ -170,7 +158,7 @@ class FragmentFriends : Fragment() {
         })
     }
 
-    // Insert fetched friend data into Room database
+    // Step 3 - Insert fetched friend data into Room database
     private fun insertFriendIntoDatabase(friend: Friend) {
         GlobalScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getInstance(requireContext())
@@ -190,6 +178,76 @@ class FragmentFriends : Fragment() {
                 Toast.makeText(requireContext(), "Friend added successfully", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // Step 4 - Fetch friend's flights (roster) data from MySQL
+    private fun fetchFriendFlightsFromMySQL(friendUserID: String, friendCode: String) {
+        Log.d("MutualDaysOffDebug", "Fetching flights for friendUserID: $friendUserID, friendCode: $friendCode")
+
+        // Call the API to fetch friend's flights
+        val flightCall = RetrofitClient.rosterApiService.getFriendRosterData(friendUserID, friendCode)
+
+        flightCall.enqueue(object : Callback<List<FriendsFlights>> {
+            override fun onResponse(call: Call<List<FriendsFlights>>, response: Response<List<FriendsFlights>>) {
+                if (response.isSuccessful) {
+                    val flightList = response.body()
+
+                    if (flightList != null && flightList.isNotEmpty()) {
+                        insertFriendFlightsIntoDatabase(flightList, friendCode)  // Pass friendCode here
+                    } else {
+                        Toast.makeText(requireContext(), "No flights found for this friend", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "Failed to fetch friend's flights", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onFailure(call: Call<List<FriendsFlights>>, t: Throwable) {
+                Toast.makeText(requireContext(), "Error fetching friend's flights: ${t.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    // Step 5 - Insert friend's flights
+    private fun insertFriendFlightsIntoDatabase(flightList: List<FriendsFlights>, friendCode: String) {
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                val db = AppDatabase.getInstance(requireContext())
+
+                // Ensure each flight has the friendCode set before insertion
+                val flightsWithFriendCode = flightList.map { flight ->
+                    flight.copy(friendCode = friendCode)  // Set friendCode if it's missing
+                }
+
+                db.friendsFlightsDao().insertAll(flightsWithFriendCode)
+                Log.d("MutualDaysOffDebug", "Successfully inserted ${flightsWithFriendCode.size} flights into the database")
+            } catch (e: Exception) {
+                Log.e("MutualDaysOffDebug", "Error inserting flights into the database: ${e.message}")
+            }
+        }
+    }
+
+    // ---------------------------------------- Core Functions  -------------------------------------------------------------------- //
+
+    // Method to handle friend selection and show the option box
+    private fun onFriendSelected() {
+        optionBox.visibility = View.VISIBLE
+
+        // Modify constraints
+        val constraintLayout = view?.findViewById<ConstraintLayout>(R.id.settingsLayout)
+        val constraintSet = ConstraintSet()
+        constraintSet.clone(constraintLayout)
+
+        // Connect
+        constraintSet.connect(
+            R.id.friendRecyclerView,
+            ConstraintSet.BOTTOM,
+            R.id.optionBox,
+            ConstraintSet.TOP
+        )
+
+        // Apply
+        constraintSet.applyTo(constraintLayout)
     }
 
     private fun findMutualDaysOff() {
@@ -226,7 +284,7 @@ class FragmentFriends : Fragment() {
 
                 withContext(Dispatchers.Main) {
                     // Format the mutual days off button
-                    daysOffButton.setText("Exit Mutual Mode")
+                    daysOffButton.text = "Exit Mutual Mode"
 
                     if (formattedMutualDaysOff.isNotEmpty()) {
                         // Update the RecyclerView
@@ -242,9 +300,10 @@ class FragmentFriends : Fragment() {
         }
     }
 
+    // ---------------------------------------- Boilerplate  -------------------------------------------------------------------- //
+
     // Restore the friends list when exiting mutual days off mode
     private fun restoreFriendsList() {
-        // Reset the button text to default
         daysOffButton.setText("Mutual Days Off")
 
         // Remove the View Roster and Mutual Days Off boxes
@@ -368,8 +427,4 @@ class FragmentFriends : Fragment() {
         val bottomNavigationView = requireActivity().findViewById<BottomNavigationView>(R.id.bottomNavigationView)
         bottomNavigationView.selectedItemId = R.id.nav_roster
     }
-
-
-
-
 }

@@ -114,8 +114,6 @@ class FragmentRoster : Fragment() {
 
     // Populate the recycleview with users shit
     private fun populateRoster() {
-
-        // Set the title
         rosterTitle.setText("My Roster")
         rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
 
@@ -129,7 +127,7 @@ class FragmentRoster : Fragment() {
         val passCode = sharedPreferences.getString("passCode", "456")
         val switchState = sharedPreferences.getBoolean("switch_state", false)
 
-        // Fetch and display data from the database first
+        // First load from local database
         CoroutineScope(Dispatchers.IO).launch {
             val db = AppDatabase.getInstance(requireContext())
             val rosterEntriesFromDb = db.dbDataDao().getAll()
@@ -138,7 +136,7 @@ class FragmentRoster : Fragment() {
             val processedEntries = processEntriesForSignOn(rosterEntriesFromDb)
 
             // Update the UI on the main thread
-            CoroutineScope(Dispatchers.Main).launch {
+            withContext(Dispatchers.Main) {
                 updateRecyclerView(processedEntries, switchState)
             }
 
@@ -147,7 +145,6 @@ class FragmentRoster : Fragment() {
         }
     }
 
-    // Normal user roster fetching
     private fun fetchRosterData(userID: String, passCode: String, useHomeTime: Boolean) {
         val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
 
@@ -159,6 +156,14 @@ class FragmentRoster : Fragment() {
                     rosterData?.let { data ->
                         if (view != null && isAdded) {
                             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                                val db = AppDatabase.getInstance(requireContext())
+
+                                // Only delete old data if new data is fetched successfully
+                                db.dbDataDao().deleteAll()
+
+                                // Insert the new data
+                                db.dbDataDao().insertAll(data)
+
                                 val processedEntries = processEntriesForSignOn(data)
                                 withContext(Dispatchers.Main) {
                                     if (isAdded && view != null) {
@@ -181,7 +186,7 @@ class FragmentRoster : Fragment() {
 
             override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
                 if (isAdded && view != null) {
-                    Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Offline Mode", Toast.LENGTH_SHORT).show()
                 }
             }
         })
@@ -205,7 +210,10 @@ class FragmentRoster : Fragment() {
 
                             // Convert FriendsFlights to DbData and update the RecyclerView
                             val dbDataList = convertFriendsFlightsToDbData(fetchedList)
-                            updateRecyclerView(dbDataList, useHomeTime = false)  // Use the converted DbData list
+
+                            // Add sign on duties and display
+                            val processedEntries = processEntriesForSignOn(dbDataList)
+                            updateRecyclerView(processedEntries, useHomeTime = false)
                         }
                     }
                 } else {
@@ -227,7 +235,8 @@ class FragmentRoster : Fragment() {
 
             var shouldUpdate = false
 
-            for (entry in fetchedEntries) {
+            for (entry in existingEntries) {
+                // Skip "Sign on" duties from being saved (since they're artificially generated)
                 if (entry.activity == "Sign on") continue
 
                 val existingFlight = existingEntries.firstOrNull { it.atd == entry.atd && it.activity == entry.activity }
@@ -269,7 +278,9 @@ class FragmentRoster : Fragment() {
             if (shouldUpdate) {
                 withContext(Dispatchers.Main) {
                     // Convert FriendsFlights to DbData before displaying
-                    val dbDataEntries = fetchedEntries.map { convertFriendsFlightsToDbData(it) }
+
+                    val dbDataEntries = convertFriendsFlightsToDbData(existingEntries)
+
                     updateRecyclerView(dbDataEntries, useHomeTime = false)
                     Toast.makeText(requireContext(), "Friend roster updated", Toast.LENGTH_SHORT).show()
                 }
