@@ -51,6 +51,8 @@ class FragmentRoster : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_roster, container, false)
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+
+        // Get saved switch state (false for local, true for home base)
         val switchState = sharedPreferences.getBoolean("switch_state", false)
         val userBase = sharedPreferences.getString("base", "Melbourne")
 
@@ -60,34 +62,30 @@ class FragmentRoster : Fragment() {
         segmentSwitch = view.findViewById(R.id.zires_switch)
         exitButton = view.findViewById(R.id.exitButton)
 
-        // Set state
-        segmentSwitch.setRightToggleText(userBase.toString())
-        segmentSwitch.setChecked(switchState)
-
-        // Exit Friend Button
-        exitButton.setOnClickListener {
-            // End friend mode
-            disableFriendMode()
-
-            // Load users data
-            populateRoster()
-        }
-
-        // Divider
-        val dividerDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.divider)
-        val dividerItemDecoration = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
-        dividerDrawable?.let { dividerItemDecoration.setDrawable(it) }
-        recyclerView.addItemDecoration(dividerItemDecoration)
-
-        // Set the LayoutManager for the RecyclerView
+        // Set LinearLayoutManager for RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        // Set the listener to toggle between local time and flight time
+        // Set the right toggle text to the user's base
+        segmentSwitch.setRightToggleText(userBase.toString())
+
+        // Set the initial checked state based on saved preference
+        segmentSwitch.setChecked(switchState)
+
+        // Fetch the current state of the segment control (local or home time) based on the switchState
+        val useHomeTime = switchState
+
+        // Populate the roster initially
+        populateRoster(useHomeTime)
+
+        // Listen for changes to the segment switch
         segmentSwitch.setOnToggleSwitchChangeListener(object : ZiresSwitchSegmentedControl.OnSwitchChangeListener {
             override fun onToggleSwitchChangeListener(isChecked: Boolean) {
-                val correctedState = !isChecked
+                // Corrected state for local/home toggle
+                val useHomeTime = !isChecked
+
+                // Save the current state in SharedPreferences
                 val editor = sharedPreferences.edit()
-                editor.putBoolean("switch_state", correctedState)
+                editor.putBoolean("switch_state", useHomeTime)
                 editor.apply()
 
                 // Get userID and passCode from sharedPreferences
@@ -95,13 +93,12 @@ class FragmentRoster : Fragment() {
                 val passCode = sharedPreferences.getString("passCode", "456")
 
                 // Fetch the roster data and update the UI based on the switch state
-                fetchRosterData(userID.toString(), passCode.toString(), correctedState)
+                fetchRosterData(userID.toString(), passCode.toString(), useHomeTime)
             }
         })
 
-        // Detect if we are in friend mode using the GlobalVariables object
+        // Check if we are in friend mode using the GlobalVariables object
         if (isFriendMode()) {
-            // Fetch and display the friend's roster
             val friendUserID = globalFriendUserID
             val friendCode = globalFriendCode
             val friendName = globalFriendName
@@ -117,7 +114,8 @@ class FragmentRoster : Fragment() {
                 Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
             }
         } else {
-            populateRoster()  // Load user's roster
+            // Populate the user's roster
+            populateRoster(useHomeTime)
         }
 
         return view
@@ -125,7 +123,7 @@ class FragmentRoster : Fragment() {
 
     // ---------------------------------------- Functions to handle the user -------------------------------------------------------------------- //
 
-    private fun populateRoster() {
+    private fun populateRoster(useHomeTime: Boolean) {
         rosterTitle.text = "My Roster"
         rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
 
@@ -136,7 +134,6 @@ class FragmentRoster : Fragment() {
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
         val userID = sharedPreferences.getString("userID", "123")
         val passCode = sharedPreferences.getString("passCode", "456")
-        val switchState = sharedPreferences.getBoolean("switch_state", false)
 
         // Load data from local database first
         lifecycleScope.launch(Dispatchers.IO) {
@@ -148,11 +145,11 @@ class FragmentRoster : Fragment() {
 
             withContext(Dispatchers.Main) {
                 // Update the UI on the main thread
-                updateRecyclerView(processedEntries, switchState)
+                updateRecyclerView(processedEntries, useHomeTime)
             }
 
             // Fetch new data from the network after displaying local data
-            fetchRosterData(userID.toString(), passCode.toString(), useHomeTime = true)
+            fetchRosterData(userID.toString(), passCode.toString(), useHomeTime)
         }
     }
 
@@ -198,13 +195,6 @@ class FragmentRoster : Fragment() {
             }
         })
     }
-
-    // Function to get roster data from local database asynchronously (for switch toggle)
-    private suspend fun getRosterDataFromDb(): List<DbData> = withContext(Dispatchers.IO) {
-        val db = AppDatabase.getInstance(requireContext())
-        return@withContext db.dbDataDao().getAll()  // Database access on background thread
-    }
-
 
     // ---------------------------------------- Handle Friends  -------------------------------------------------------------------- //
 
