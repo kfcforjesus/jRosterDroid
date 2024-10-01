@@ -65,8 +65,8 @@ class FragmentSettings : Fragment() {
 
             // Clear all the stored preferences
             val editor = sharedPreferences.edit()
-            editor.clear() // This will remove all saved data
-            editor.apply() // Apply the changes
+            editor.clear()
+            editor.apply()
 
             // Notify the user
             Toast.makeText(requireContext(), "All preferences have been cleared!", Toast.LENGTH_SHORT).show()
@@ -175,14 +175,6 @@ class FragmentSettings : Fragment() {
         }
 
         return view
-    }
-
-    // Save the users name to user prefs
-    private fun saveNameToPreferences(name: String) {
-        val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
-        editor.putString("userName", name)
-        editor.apply()
     }
 
     private fun fetchFriendDataFromMySQL(userID: String) {
@@ -317,7 +309,7 @@ class FragmentSettings : Fragment() {
 
     private fun showAlert(title: String, message: String) {
         // Create an AlertDialog builder with the context of the fragment
-        val builder = AlertDialog.Builder(requireContext()) // Use 'requireContext()' for Fragment
+        val builder = AlertDialog.Builder(requireContext())
 
         // Set the title and message of the alert dialog
         builder.setTitle(title)
@@ -325,7 +317,7 @@ class FragmentSettings : Fragment() {
 
         // Add a button to the dialog
         builder.setPositiveButton("OK") { dialog, _ ->
-            dialog.dismiss() // Close the dialog when the button is pressed
+            dialog.dismiss()
         }
 
         // Create and display the alert dialog

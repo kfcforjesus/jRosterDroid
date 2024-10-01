@@ -208,7 +208,7 @@ class FragmentFriends : Fragment() {
         })
     }
 
-    // Step 5 - Insert friend's flights
+    // Step 5 - Insert friend's flights into Room DB
     private fun insertFriendFlightsIntoDatabase(flightList: List<FriendsFlights>, friendCode: String) {
         GlobalScope.launch(Dispatchers.IO) {
             try {
@@ -220,7 +220,6 @@ class FragmentFriends : Fragment() {
                 }
 
                 db.friendsFlightsDao().insertAll(flightsWithFriendCode)
-                Log.d("MutualDaysOffDebug", "Successfully inserted ${flightsWithFriendCode.size} flights into the database")
             } catch (e: Exception) {
                 Log.e("MutualDaysOffDebug", "Error inserting flights into the database: ${e.message}")
             }
@@ -376,14 +375,6 @@ class FragmentFriends : Fragment() {
             .setMessage(message)
             .setPositiveButton("OK", null)
             .show()
-    }
-
-    // Access the global vars
-    private fun returnFriendsDetails(selectedFriend: Friend) {
-        GlobalVariables.globalFriendUserID = selectedFriend.userID
-        GlobalVariables.globalFriendCode = selectedFriend.friendCode
-        GlobalVariables.globalFriendName = selectedFriend.name
-        GlobalVariables.isFriendMode = true
     }
 
     fun saveSelectedFriendDetails(context: Context, friendID: String, friendCode: String, friendName: String) {

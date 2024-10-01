@@ -43,8 +43,6 @@ class FragmentRoster : Fragment() {
     private var isFirstLoad = true
     private val wdoDates: MutableSet<String> = mutableSetOf()
 
-    var shouldScrollToClosestDate = true
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -73,6 +71,16 @@ class FragmentRoster : Fragment() {
 
         // Fetch the current state of the segment control (local or home time) based on the switchState
         val useHomeTime = switchState  // When the switch is unchecked (left), use local time
+
+        // Divider setup
+        val dividerDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.divider)
+        val dividerItemDecoration = DividerItemDecoration(recyclerView.context, LinearLayoutManager.VERTICAL)
+
+        // Check if the dividerDrawable is not null
+        dividerDrawable?.let {
+            dividerItemDecoration.setDrawable(it)
+            recyclerView.addItemDecoration(dividerItemDecoration)
+        }
 
         // Listen for changes to the segment switch
         segmentSwitch.setOnToggleSwitchChangeListener(object : ZiresSwitchSegmentedControl.OnSwitchChangeListener {
@@ -145,7 +153,7 @@ class FragmentRoster : Fragment() {
     // ---------------------------------------- Functions to handle the user -------------------------------------------------------------------- //
 
     private fun populateRoster(useHomeTime: Boolean) {
-        rosterTitle.text = "My Roster"
+        rosterTitle.setText( "My Roster")
         rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
 
         // Reinstate the time toggle
@@ -188,8 +196,8 @@ class FragmentRoster : Fragment() {
 
                             // Only clear the database and insert if we get non-empty data
                             if (data.isNotEmpty()) {
-                                db.dbDataDao().deleteAll()  // Clear old data
-                                db.dbDataDao().insertAll(data)  // Insert fetched data into the database
+                                db.dbDataDao().deleteAll()
+                                db.dbDataDao().insertAll(data)
                             }
 
                             val processedEntries = processEntriesForSignOn(data)
@@ -336,9 +344,9 @@ class FragmentRoster : Fragment() {
                 continue
             }
 
-            val checkInDate = entry.checkIn?.let { parseDate(it) }
+            val checkInDate = entry.checkIn.let { parseDate(it) }
             if (checkInDate != null && checkInDate.after(cutoffDate)) {
-                val atdDate = entry.atd?.let { parseDate(it) }
+                val atdDate = entry.atd.let { parseDate(it) }
                 if (!seenCheckInTimesByDate[entry.date]!!.contains(checkInDate) && checkInDate != atdDate) {
                     seenCheckInTimesByDate[entry.date]!!.add(checkInDate)
                     val signOnEntry = DbData(
