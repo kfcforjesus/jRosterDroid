@@ -49,6 +49,9 @@ class FragmentRoster : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         val view = inflater.inflate(R.layout.fragment_roster, container, false)
+        val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+        val switchState = sharedPreferences.getBoolean("switch_state", false)
+        val userBase = sharedPreferences.getString("base", "Melbourne")
 
         // Initialize RecyclerView
         recyclerView = view.findViewById(R.id.rosterRecyclerView)
@@ -56,9 +59,12 @@ class FragmentRoster : Fragment() {
         segmentSwitch = view.findViewById(R.id.zires_switch)
         exitButton = view.findViewById(R.id.exitButton)
 
+        // Set state
+        segmentSwitch.setRightToggleText(userBase.toString())
+        segmentSwitch.setChecked(switchState)
+
         // Exit Friend Button
         exitButton.setOnClickListener {
-
             // End friend mode
             disableFriendMode()
 
@@ -75,36 +81,42 @@ class FragmentRoster : Fragment() {
         // Set the LayoutManager for the RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
+        // Set the listener to toggle between local time and flight time
+        segmentSwitch.setOnToggleSwitchChangeListener(object : ZiresSwitchSegmentedControl.OnSwitchChangeListener {
+            override fun onToggleSwitchChangeListener(isChecked: Boolean) {
+                val correctedState = !isChecked
+                val editor = sharedPreferences.edit()
+                editor.putBoolean("switch_state", correctedState)
+                editor.apply()
+
+                // Get userID and passCode from sharedPreferences
+                val userID = sharedPreferences.getString("userID", "123")
+                val passCode = sharedPreferences.getString("passCode", "456")
+
+                // Fetch the roster data and update the UI based on the switch state
+                fetchRosterData(userID.toString(), passCode.toString(), correctedState)
+            }
+        })
+
         // Detect if we are in friend mode using the GlobalVariables object
         if (isFriendMode()) {
-
             // Fetch and display the friend's roster
             val friendUserID = globalFriendUserID
             val friendCode = globalFriendCode
             val friendName = globalFriendName
 
-            // Set the title
-            rosterTitle.setText(friendName)
+            rosterTitle.text = friendName
             rosterTitle.setTextColor(Color.RED)
-
-            // Remove the time toggle
             segmentSwitch.isVisible = false
             exitButton.isVisible = true
 
-
             if (friendUserID != null && friendCode != null) {
-                // Two step process.
-                // 1. Load from Rooms DB
-                // 2. Check for network then update via mysql
                 fetchAndUpdateFriendRoster(friendUserID, friendCode)
-
             } else {
                 Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
             }
         } else {
-
-           // Load users data
-           populateRoster()
+            populateRoster()  // Load user's roster
         }
 
         return view
@@ -112,36 +124,34 @@ class FragmentRoster : Fragment() {
 
     // ---------------------------------------- Functions to handle the user -------------------------------------------------------------------- //
 
-    // Populate the recycleview with users shit
     private fun populateRoster() {
-        rosterTitle.setText("My Roster")
+        rosterTitle.text = "My Roster"
         rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
 
         // Reinstate the time toggle
         segmentSwitch.isVisible = true
         exitButton.isGone = true
 
-        // Fetch and display the current user's roster
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
         val userID = sharedPreferences.getString("userID", "123")
         val passCode = sharedPreferences.getString("passCode", "456")
         val switchState = sharedPreferences.getBoolean("switch_state", false)
 
-        // First load from local database
-        CoroutineScope(Dispatchers.IO).launch {
+        // Load data from local database first
+        lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getInstance(requireContext())
-            val rosterEntriesFromDb = db.dbDataDao().getAll()
+            val rosterEntriesFromDb = db.dbDataDao().getAll()  // Access database on the IO thread
 
             // Process entries for Sign On
             val processedEntries = processEntriesForSignOn(rosterEntriesFromDb)
 
-            // Update the UI on the main thread
             withContext(Dispatchers.Main) {
+                // Update the UI on the main thread
                 updateRecyclerView(processedEntries, switchState)
             }
 
-            // Then fetch new data from the network
-            fetchRosterData(userID.toString(), passCode.toString(), switchState)
+            // Fetch new data from the network after displaying local data
+            fetchRosterData(userID.toString(), passCode.toString(), useHomeTime = true)
         }
     }
 
@@ -154,43 +164,46 @@ class FragmentRoster : Fragment() {
                     val rosterData = response.body()
 
                     rosterData?.let { data ->
-                        if (view != null && isAdded) {
-                            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                                val db = AppDatabase.getInstance(requireContext())
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val db = AppDatabase.getInstance(requireContext())
 
-                                // Only delete old data if new data is fetched successfully
-                                db.dbDataDao().deleteAll()
+                            // Only clear the database and insert if we get non-empty data
+                            if (data.isNotEmpty()) {
+                                db.dbDataDao().deleteAll()  // Clear old data
+                                db.dbDataDao().insertAll(data)  // Insert fetched data into the database
+                            }
 
-                                // Insert the new data
-                                db.dbDataDao().insertAll(data)
-
-                                val processedEntries = processEntriesForSignOn(data)
-                                withContext(Dispatchers.Main) {
-                                    if (isAdded && view != null) {
-                                        updateRecyclerView(processedEntries, useHomeTime)
-                                    }
-                                }
+                            val processedEntries = processEntriesForSignOn(data)
+                            withContext(Dispatchers.Main) {
+                                updateRecyclerView(processedEntries, useHomeTime)
                             }
                         }
                     } ?: run {
-                        if (isAdded && view != null) {
+                        lifecycleScope.launch(Dispatchers.Main) {
                             Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
-                    if (isAdded && view != null) {
+                    lifecycleScope.launch(Dispatchers.Main) {
                         Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
 
             override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
-                if (isAdded && view != null) {
-                    Toast.makeText(requireContext(), "Offline Mode", Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch(Dispatchers.Main) {
+                    Toast.makeText(requireContext(), "Offline Mode: Unable to fetch data", Toast.LENGTH_SHORT).show()
                 }
             }
         })
     }
+
+    // Function to get roster data from local database asynchronously (for switch toggle)
+    private suspend fun getRosterDataFromDb(): List<DbData> = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getInstance(requireContext())
+        return@withContext db.dbDataDao().getAll()  // Database access on background thread
+    }
+
 
     // ---------------------------------------- Handle Friends  -------------------------------------------------------------------- //
 
@@ -286,22 +299,6 @@ class FragmentRoster : Fragment() {
                 }
             }
         }
-    }
-
-    // Convert FriendsFlights to DbData for display in RecyclerView
-    private fun convertFriendsFlightsToDbData(flight: FriendsFlights): DbData {
-        return DbData(
-            dd = flight.dd ?: "",
-            date = flight.date,
-            activity = flight.activity,
-            checkIn = flight.checkIn ?: "",
-            atd = flight.atd,
-            dest = flight.dest,
-            orig = flight.orig,
-            ata = flight.ata ?: "",
-            checkOut = flight.checkOut ?: "",
-            ac = ""
-        )
     }
 
     // ---------------------------------------- Core Functions  -------------------------------------------------------------------- //
