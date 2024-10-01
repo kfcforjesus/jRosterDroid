@@ -2,7 +2,9 @@ package com.example.jroster
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -22,6 +24,12 @@ import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -37,6 +45,9 @@ class FragmentSettings : Fragment() {
     private lateinit var exportOffButton: RadioButton
     private lateinit var exportOnButton: RadioButton
     private lateinit var baseSpinner: Spinner
+    private lateinit var logoutButton: Button
+    private lateinit var syncButton: Button
+    private lateinit var syncLabel: TextView
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -49,11 +60,20 @@ class FragmentSettings : Fragment() {
         nameEditText = view.findViewById(R.id.nameEditText)
         saveButton = view.findViewById(R.id.conditionButton)
         baseLabel = view.findViewById(R.id.baseLabel)
+        logoutButton = view.findViewById(R.id.logoutButton)
+        syncButton = view.findViewById(R.id.syncRosterButton)
+        syncLabel = view.findViewById(R.id.lastSyncedTime)
 
         // Initialize radio buttons
         exportRadioGroup = view.findViewById(R.id.exportRadioGroup)
         exportOffButton = view.findViewById(R.id.exportOff)
         exportOnButton = view.findViewById(R.id.exportOn)
+
+        // Initialize SharedPreferences
+        sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+
+        // Call updateSyncLabel()
+        updateSyncLabel()
 
         // Inside your Fragment's onCreateView or onViewCreated method
         val instructionsButton = view.findViewById<Button>(R.id.instructionsButton)
@@ -72,8 +92,36 @@ class FragmentSettings : Fragment() {
             Toast.makeText(requireContext(), "All preferences have been cleared!", Toast.LENGTH_SHORT).show()
         }
 
-        // Initialize SharedPreferences
-        sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+        // Set a click listener for the logout button
+        logoutButton.setOnClickListener {
+            // Confirm logout action with an alert dialog
+            AlertDialog.Builder(requireContext())
+                .setTitle("Confirm Logout")
+                .setMessage("Are you sure you want to log out?  This action will completely reset JRoster")
+                .setPositiveButton("Yes") { _, _ ->
+                    // Take action
+                    logoutAction()
+                }
+                .setNegativeButton("No", null)
+                .show()
+        }
+
+        // Set a click listener for the sync roster button
+        syncButton.setOnClickListener {
+            val userID = sharedPreferences.getString("userID", "") ?: ""
+            val passCode = sharedPreferences.getString("passCode", "") ?: ""
+
+            // Store the current timestamp (in milliseconds)
+            val currentTime = System.currentTimeMillis()
+            sharedPreferences.edit().putLong("lastSyncTime", currentTime).apply()
+
+            // Update the local DB from MySQL
+            fetchRosterData(userID, passCode)
+
+            // Update the sync label immediately after sync
+            syncLabel.text = "0 min"
+        }
+
 
         // Initialize the EditText
         val nameEditText = view.findViewById<EditText>(R.id.nameEditText)
@@ -175,6 +223,48 @@ class FragmentSettings : Fragment() {
         }
 
         return view
+    }
+
+    private fun fetchRosterData(userID: String, passCode: String) {
+        val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
+
+        call.enqueue(object : retrofit2.Callback<List<DbData>> {
+            override fun onResponse(call: retrofit2.Call<List<DbData>>, response: retrofit2.Response<List<DbData>>) {
+                if (response.isSuccessful) {
+                    val rosterData = response.body()
+
+                    rosterData?.let { data ->
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val db = AppDatabase.getInstance(requireContext())
+
+                            // Only clear the database and insert if we get non-empty data
+                            if (data.isNotEmpty()) {
+                                db.dbDataDao().deleteAll()
+                                db.dbDataDao().insertAll(data)
+                            }
+
+                            lifecycleScope.launch(Dispatchers.Main) {
+                                Toast.makeText(requireContext(), "Roster Synced Successfully", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } ?: run {
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            override fun onFailure(call: retrofit2.Call<List<DbData>>, t: Throwable) {
+                lifecycleScope.launch(Dispatchers.Main) {
+                    Toast.makeText(requireContext(), "Offline Mode: Unable to fetch data", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
     }
 
     private fun fetchFriendDataFromMySQL(userID: String) {
@@ -324,4 +414,53 @@ class FragmentSettings : Fragment() {
         val alertDialog = builder.create()
         alertDialog.show()
     }
+
+    // Function to handle the logout action
+    private fun logoutAction() {
+        // 1. Clear all data from the local database
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.getInstance(requireContext())
+            db.clearAllTables()
+
+            withContext(Dispatchers.Main) {
+                // 2. Clear all shared preferences
+                sharedPreferences.edit().clear().apply()
+
+                // 3. Return the user to the main activity
+                val intent = Intent(requireContext(), MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+
+                // Optionally, display a toast message
+                Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Function to calculate and update the sync label
+    fun updateSyncLabel() {
+        val lastSyncTime = sharedPreferences.getLong("lastSyncTime", 0L)
+
+        if (lastSyncTime > 0) {
+            val currentTime = System.currentTimeMillis()
+            val timeDiffInMinutes = ((currentTime - lastSyncTime) / 1000 / 60).toInt()
+
+            val days = timeDiffInMinutes / (24 * 60)
+            val hours = (timeDiffInMinutes % (24 * 60)) / 60
+            val minutes = timeDiffInMinutes % 60
+
+            // Constructing the formatted time string
+            val formattedTime = when {
+                days > 0 -> "$days Days $hours Hours $minutes Min"
+                hours > 0 -> "$hours Hour $minutes Min"
+                else -> "$minutes Min"
+            }
+
+            syncLabel.text = formattedTime
+        } else {
+            // If there's no sync time saved yet
+            syncLabel.text = "Not Synced"
+        }
+    }
+
 }

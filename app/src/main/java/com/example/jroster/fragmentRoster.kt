@@ -198,11 +198,18 @@ class FragmentRoster : Fragment() {
                             if (data.isNotEmpty()) {
                                 db.dbDataDao().deleteAll()
                                 db.dbDataDao().insertAll(data)
+
+                                // Reset the sync time in SharedPreferences
+                                val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+                                val editor = sharedPreferences.edit()
+                                editor.putLong("lastSyncTime", System.currentTimeMillis())
+                                editor.apply() //
                             }
 
                             val processedEntries = processEntriesForSignOn(data)
                             withContext(Dispatchers.Main) {
                                 updateRecyclerView(processedEntries, useHomeTime)
+
                             }
                         }
                     } ?: run {
@@ -210,6 +217,7 @@ class FragmentRoster : Fragment() {
                             Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
                         }
                     }
+
                 } else {
                     lifecycleScope.launch(Dispatchers.Main) {
                         Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
