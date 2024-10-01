@@ -25,6 +25,7 @@ import retrofit2.Callback
 import retrofit2.Response
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.core.view.isGone
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
@@ -232,7 +233,6 @@ class FragmentFriends : Fragment() {
                         friendAdapter.updateData(formattedMutualDaysOff, isDaysOff = true)
                         recyclerView.scrollToPosition(0)
                     } else {
-                        Toast.makeText(requireContext(), "No mutual days off", Toast.LENGTH_SHORT).show()
                         friendAdapter.updateData(listOf("No mutual days off"), isDaysOff = true)
                     }
                 }
@@ -247,23 +247,24 @@ class FragmentFriends : Fragment() {
         // Reset the button text to default
         daysOffButton.setText("Mutual Days Off")
 
-        // Fetch and update the RecyclerView with the friends list from the database
+        // Remove the View Roster and Mutual Days Off boxes
+        optionBox.isGone = true
+
+        // Fetch and update the RecyclerView
         GlobalScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getInstance(requireContext())
             val friends = db.friendDao().getAllFriends()
 
             withContext(Dispatchers.Main) {
-                // Update the RecyclerView with the friends list and re-enable selection
+                // Update the RecyclerView
                 friendAdapter.updateData(friends, isDaysOff = false)
-                recyclerView.scrollToPosition(0) // Scroll to top after restoring
+                recyclerView.scrollToPosition(0)
 
                 // Re-enable friend selection
-                friendAdapter.notifyDataSetChanged() // Ensure the adapter is fully refreshed
+                friendAdapter.notifyDataSetChanged()
             }
         }
     }
-
-
 
     // Delete a friend from Rooms
     private fun deleteFriend(friend: Friend) {
