@@ -121,6 +121,9 @@ class FragmentRoster : Fragment() {
             val passCode = sharedPreferences.getString("passCode", "456")
 
             // Reload the user's roster
+            loadFriendRosterFromDb(userID.toString(), passCode.toString())
+
+            // Update via MySQL
             fetchRosterData(userID.toString(), passCode.toString(), useHomeTime)
         }
 
@@ -136,10 +139,10 @@ class FragmentRoster : Fragment() {
             exitButton.isVisible = true
 
             if (friendUserID != null && friendCode != null) {
-                Log.d("Friend", "Friend mode on")
-                fetchAndUpdateFriendRoster(friendUserID, friendCode)
+                // Load from Rooms (mysql update will flow automatically)
+                loadFriendRosterFromDb(friendUserID, friendCode)
+
             } else {
-                Log.d("Friend", "Friend mode OFF")
                 Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
             }
         } else {
@@ -235,6 +238,36 @@ class FragmentRoster : Fragment() {
 
     // ---------------------------------------- Handle Friends  -------------------------------------------------------------------- //
 
+    // Step 1 - Load from DB
+    private fun loadFriendRosterFromDb(friendUserID: String, friendCode: String) {
+        // First try to load from the local database
+        CoroutineScope(Dispatchers.IO).launch {
+            val db = AppDatabase.getInstance(requireContext())
+            val localEntries = db.friendsFlightsDao().getFlightsByFriendCode(friendCode)
+
+            if (localEntries.isNotEmpty()) {
+                // Convert FriendsFlights to DbData and process them
+                val dbDataList = convertFriendsFlightsToDbData(localEntries)
+                val processedEntries = processEntriesForSignOn(dbDataList)
+
+                // Update UI with the local data first
+                withContext(Dispatchers.Main) {
+                    updateRecyclerView(processedEntries, useHomeTime = false, isFriendMode = true)
+
+                    // Scroll to today's date after updating RecyclerView
+                    scrollToClosestDate(processedEntries.groupBy { it.date }.keys.sorted(), processedEntries.groupBy { it.date }, recyclerView)
+
+                    Toast.makeText(requireContext(), "Loaded friend roster from local DB", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            // Now update via MySQL
+            fetchAndUpdateFriendRoster(friendUserID, friendCode)
+        }
+    }
+
+
+    // Step 2 - Load from MySQL
     private fun fetchAndUpdateFriendRoster(friendUserID: String, friendCode: String) {
         val call = RetrofitClient.rosterApiService.getFriendRosterData(friendUserID, friendCode)
 
@@ -247,7 +280,7 @@ class FragmentRoster : Fragment() {
                     // Only update if data exists
                     fetchedEntries?.let { fetchedList ->
                         if (fetchedList.isNotEmpty()) {
-                            // Call compareAndUpdateFriendRosterData before updating the UI
+                            // Update from MySQL first
                             compareAndUpdateFriendRosterData(fetchedList, friendCode)
 
                             // Convert FriendsFlights to DbData and process them
@@ -256,6 +289,11 @@ class FragmentRoster : Fragment() {
 
                             // Ensure the UI is updated with friend's data
                             updateRecyclerView(processedEntries, useHomeTime = false, isFriendMode = true)
+
+                            // Scroll to today's date after updating RecyclerView
+                            scrollToClosestDate(processedEntries.groupBy { it.date }.keys.sorted(), processedEntries.groupBy { it.date }, recyclerView)
+
+                            Toast.makeText(requireContext(), "Friend roster updated from MySQL", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
@@ -270,7 +308,8 @@ class FragmentRoster : Fragment() {
     }
 
 
-    // Function to compare and update friend's flights from the fetched data
+
+    // Step 3 - Function to compare and update friend's flights from the fetched data
     private fun compareAndUpdateFriendRosterData(fetchedEntries: List<FriendsFlights>, friendCode: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val db = AppDatabase.getInstance(requireContext())
@@ -294,7 +333,7 @@ class FragmentRoster : Fragment() {
                         existingFlight.dest != entry.dest ||
                         existingFlight.orig != entry.orig
                     ) {
-                        // Update existing entry (ensure the friendCode is retained)
+                        // Update existing entry
                         val updatedFlight = existingFlight.copy(
                             ata = entry.ata,
                             checkIn = entry.checkIn,
@@ -303,7 +342,7 @@ class FragmentRoster : Fragment() {
                             dd = entry.dd,
                             dest = entry.dest,
                             orig = entry.orig,
-                            friendCode = friendCode // Ensure friendCode is set properly
+                            friendCode = friendCode
                         )
 
                         db.friendsFlightsDao().insertAll(listOf(updatedFlight))
@@ -321,7 +360,6 @@ class FragmentRoster : Fragment() {
             if (shouldUpdate) {
                 withContext(Dispatchers.Main) {
                     // Convert FriendsFlights to DbData before displaying
-
                     val dbDataEntries = convertFriendsFlightsToDbData(existingEntries)
 
                     updateRecyclerView(dbDataEntries, useHomeTime = false)
@@ -444,6 +482,7 @@ class FragmentRoster : Fragment() {
             recyclerView.scrollToPosition(it)
         }
     }
+
 
     // ---------------------------------------- Boiler plate  -------------------------------------------------------------------- //
 
