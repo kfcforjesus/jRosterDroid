@@ -11,9 +11,9 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 
 class FriendAdapter(
-    private var friendList: List<Any>,  // Changed to List<Any> to handle both Friend and String objects
+    private var friendList: List<Any>,
     private val onFriendSelectedCallback: () -> Unit,
-    private val onDeleteFriendCallback: (Friend) -> Unit // Add a delete callback
+    private val onDeleteFriendCallback: (Friend) -> Unit
 ) : RecyclerView.Adapter<FriendAdapter.FriendViewHolder>() {
 
     private var selectedPosition = -1
@@ -25,30 +25,36 @@ class FriendAdapter(
     }
 
     override fun onBindViewHolder(holder: FriendViewHolder, position: Int) {
-        val item = friendList[holder.adapterPosition]
+        val item = friendList[holder.adapterPosition] // Friend or MDO
         holder.bind(item, holder.adapterPosition == selectedPosition, isDisplayingDaysOff)
 
-        // Set click listener for the item (only if we are not displaying mutual days off)
-        if (!isDisplayingDaysOff) {
-            holder.itemView.setOnClickListener {
-                val previousSelectedPosition = selectedPosition
-                selectedPosition = holder.adapterPosition
+        // Set click listener for the item
+        holder.itemView.setOnClickListener {
+            val previousSelectedPosition = selectedPosition
+            selectedPosition = holder.adapterPosition
 
-                // Notify the adapter of the previous and current selection changes
-                if (previousSelectedPosition != -1) {
-                    notifyItemChanged(previousSelectedPosition)
-                }
-                notifyItemChanged(selectedPosition)
+            // Notify the adapter of the previous and current selection changes
+            if (previousSelectedPosition != -1) {
+                notifyItemChanged(previousSelectedPosition)
+            }
+            notifyItemChanged(selectedPosition)
 
-                // Trigger the callback to notify FragmentFriends of selection
-                onFriendSelectedCallback()
+            // Callback to notify FragmentFriends of selection
+            onFriendSelectedCallback()
+        }
+
+        // Set the visibility of the delete icon based on selection status
+        if (!isDisplayingDaysOff && item is Friend) {
+            if (holder.adapterPosition == selectedPosition) {
+                holder.deleteIcon.isVisible = true
+            } else {
+                holder.deleteIcon.isVisible = false
             }
 
-            // Set click listener for the delete icon (for friends only)
+            // Set click listener
             holder.deleteIcon.setOnClickListener {
-                onDeleteFriendCallback(friendList[holder.adapterPosition] as Friend)
+                onDeleteFriendCallback(item)
             }
-            holder.deleteIcon.isVisible = true
         } else {
             holder.deleteIcon.isVisible = false
         }
@@ -77,6 +83,7 @@ class FriendAdapter(
         private val friendNameTextView: TextView = itemView.findViewById(R.id.friendName)
         val deleteIcon: ImageView = itemView.findViewById(R.id.deleteIcon) // Make it accessible
 
+        // Updated bind function to handle either Friend object or String for mutual days off
         fun bind(item: Any, isSelected: Boolean, isDisplayingDaysOff: Boolean) {
             when (item) {
                 is Friend -> {
@@ -107,4 +114,5 @@ class FriendAdapter(
             }
         }
     }
+
 }
