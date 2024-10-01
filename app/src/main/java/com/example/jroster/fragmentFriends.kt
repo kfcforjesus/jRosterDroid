@@ -28,9 +28,9 @@ import androidx.constraintlayout.widget.ConstraintSet
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class FragmentFriends : Fragment() {
 
@@ -38,9 +38,10 @@ class FragmentFriends : Fragment() {
     private lateinit var addFriendButton: Button
     private lateinit var friendCodeInput: EditText
     private lateinit var viewRosterButton: Button
+    private lateinit var daysOffButton: Button //
     private lateinit var friendAdapter: FriendAdapter
     private lateinit var optionBox: LinearLayout
-
+    private val daysOffCodes = listOf("OFF", "WOF", "FDO", "ROF", "7OF", "APO", "CDO", "EOF", "EWD", "FOF", "LOF", "MOF", "NDM", "NOF", "OBA", "OFR", "PHO", "POF", "RO1", "SOF", "STR", "UOF", "WDL", "WDS", "XMS", "XOF", "AOF", "A0F")
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -54,6 +55,7 @@ class FragmentFriends : Fragment() {
         friendCodeInput = view.findViewById(R.id.friendCodeInput)
         optionBox = view.findViewById(R.id.optionBox)
         viewRosterButton = view.findViewById(R.id.viewRosterButton)
+        daysOffButton = view.findViewById(R.id.daysOffButton)
 
         // Set up RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -81,6 +83,16 @@ class FragmentFriends : Fragment() {
         // Set up View Roster Button Listener
         viewRosterButton.setOnClickListener {
             viewRoster()
+        }
+
+        // Inside onCreateView or wherever the button is set up
+        daysOffButton.setOnClickListener {
+            if (daysOffButton.text != "Mutual Days Off") {
+                restoreFriendsList()
+            } else {
+                // Find mutual days off and display them
+                findMutualDaysOff()
+            }
         }
 
         // Hide the optionBox initially
@@ -179,6 +191,80 @@ class FragmentFriends : Fragment() {
         }
     }
 
+    private fun findMutualDaysOff() {
+        val selectedFriend = getSelectedFriendFromDatabase()
+
+        if (selectedFriend != null) {
+            GlobalScope.launch(Dispatchers.IO) {
+                val db = AppDatabase.getInstance(requireContext())
+
+                // Get today's date in the correct format (yyyy-MM-dd)
+                val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val today = dateFormatter.format(Date())
+
+                // Fetch friend's day-off entries from today onwards
+                val friendDaysOff = db.friendsFlightsDao().getFlightsByFriendCodeAndActivityFromDate(
+                    selectedFriend.friendCode,
+                    daysOffCodes,
+                    today
+                ).map { it.date }
+
+                // Fetch user's day-off entries from today onwards
+                val userDaysOff = db.dbDataDao().getUserDaysOffFromDate(daysOffCodes, today).map { it.date }
+
+                // Compare the two lists to find mutual days off
+                val mutualDaysOff = userDaysOff.intersect(friendDaysOff).toList()
+
+                // Create a date formatter for the desired format: "E d MMM"
+                val outputDateFormatter = SimpleDateFormat("E d MMM", Locale.getDefault())
+
+                val formattedMutualDaysOff = mutualDaysOff.map { date ->
+                    val parsedDate = dateFormatter.parse(date)
+                    parsedDate?.let { outputDateFormatter.format(it) } ?: date
+                }
+
+                withContext(Dispatchers.Main) {
+                    // Format the mutual days off button
+                    daysOffButton.setText("Exit Mutual Mode")
+
+                    if (formattedMutualDaysOff.isNotEmpty()) {
+                        // Update the RecyclerView
+                        friendAdapter.updateData(formattedMutualDaysOff, isDaysOff = true)
+                        recyclerView.scrollToPosition(0)
+                    } else {
+                        Toast.makeText(requireContext(), "No mutual days off", Toast.LENGTH_SHORT).show()
+                        friendAdapter.updateData(listOf("No mutual days off"), isDaysOff = true)
+                    }
+                }
+            }
+        } else {
+            Toast.makeText(requireContext(), "Please select a friend first.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Restore the friends list when exiting mutual days off mode
+    private fun restoreFriendsList() {
+        // Reset the button text to default
+        daysOffButton.setText("Mutual Days Off")
+
+        // Fetch and update the RecyclerView with the friends list from the database
+        GlobalScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.getInstance(requireContext())
+            val friends = db.friendDao().getAllFriends()
+
+            withContext(Dispatchers.Main) {
+                // Update the RecyclerView with the friends list and re-enable selection
+                friendAdapter.updateData(friends, isDaysOff = false)
+                recyclerView.scrollToPosition(0) // Scroll to top after restoring
+
+                // Re-enable friend selection
+                friendAdapter.notifyDataSetChanged() // Ensure the adapter is fully refreshed
+            }
+        }
+    }
+
+
+
     // Delete a friend from Rooms
     private fun deleteFriend(friend: Friend) {
         AlertDialog.Builder(requireContext())
@@ -209,7 +295,8 @@ class FragmentFriends : Fragment() {
             val db = AppDatabase.getInstance(requireContext())
             val friends = db.friendDao().getAllFriends()
             launch(Dispatchers.Main) {
-                friendAdapter.updateData(friends)
+                // Bit of a hack but it works
+                friendAdapter.updateData(friends, isDaysOff = false)
             }
         }
     }

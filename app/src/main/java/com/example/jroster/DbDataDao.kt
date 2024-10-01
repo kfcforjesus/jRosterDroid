@@ -19,4 +19,10 @@ interface DbDataDao {
 
     @Query("DELETE FROM DbData")
     suspend fun clearAll()
+
+    @Query("SELECT * FROM dbdata WHERE activity IN (:daysOffCodes)")
+    suspend fun getUserDaysOff(daysOffCodes: List<String>): List<DbData>
+
+    @Query("SELECT * FROM dbdata WHERE activity IN (:activities) AND date >= :fromDate")
+    suspend fun getUserDaysOffFromDate(activities: List<String>, fromDate: String): List<DbData>
 }
