@@ -93,7 +93,11 @@ class FragmentRoster : Fragment() {
 
 
             if (friendUserID != null && friendCode != null) {
-                fetchFriendRoster(friendUserID, friendCode)
+                // Two step process.
+                // 1. Load from Rooms DB
+                // 2. Check for network then update via mysql
+                fetchAndUpdateFriendRoster(friendUserID, friendCode)
+
             } else {
                 Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
             }
@@ -185,49 +189,109 @@ class FragmentRoster : Fragment() {
 
     // ---------------------------------------- Handle Friends  -------------------------------------------------------------------- //
 
-    // Fetch the friend's roster data ROOMS DB
-    private fun fetchFriendRoster(userID: String, friendCode: String) {
-        val call = RetrofitClient.rosterApiService.getFriendRosterData(userID, friendCode)
+    private fun fetchAndUpdateFriendRoster(friendUserID: String, friendCode: String) {
+        val call = RetrofitClient.rosterApiService.getFriendRosterData(friendUserID, friendCode)
 
         // Queue the API call
-        call.enqueue(object : Callback<List<DbData>> {
-            override fun onResponse(call: Call<List<DbData>>, response: Response<List<DbData>>) {
+        call.enqueue(object : Callback<List<FriendsFlights>> {
+            override fun onResponse(call: Call<List<FriendsFlights>>, response: Response<List<FriendsFlights>>) {
                 if (response.isSuccessful) {
-                    val friendRosterData = response.body()
+                    val fetchedEntries = response.body()
 
-                    // Check if friendRosterData is not null
-                    friendRosterData?.let { data ->
-                        if (view != null && isAdded) {
-                            // Update the RecyclerView
-                            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                                val processedEntries = processEntriesForSignOn(data)
-                                withContext(Dispatchers.Main) {
-                                    if (isAdded && view != null) {
-                                        updateRecyclerView(processedEntries, useHomeTime = false)
-                                    }
-                                }
-                            }
-                        }
-                    } ?: run {
-                        if (isAdded && view != null) {
-                            Toast.makeText(requireContext(), "No records found for this friend", Toast.LENGTH_SHORT).show()
+                    // Only update if data exists
+                    fetchedEntries?.let { fetchedList ->
+                        if (fetchedList.isNotEmpty()) {
+                            compareAndUpdateFriendRosterData(fetchedList, friendCode)
+
+                            // Convert FriendsFlights to DbData and update the RecyclerView
+                            val dbDataList = convertFriendsFlightsToDbData(fetchedList)
+                            updateRecyclerView(dbDataList, useHomeTime = false)  // Use the converted DbData list
                         }
                     }
                 } else {
-                    if (isAdded && view != null) {
-                        Toast.makeText(requireContext(), "Failed to fetch friend's roster data", Toast.LENGTH_SHORT).show()
-                    }
+                    Toast.makeText(requireContext(), "Failed to fetch friend's roster data", Toast.LENGTH_SHORT).show()
                 }
             }
 
-            override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
-                if (isAdded && view != null) {
-                    Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
-                }
+            override fun onFailure(call: Call<List<FriendsFlights>>, t: Throwable) {
+                Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         })
     }
 
+    // Function to compare and update friend's flights from the fetched data
+    private fun compareAndUpdateFriendRosterData(fetchedEntries: List<FriendsFlights>, friendCode: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val db = AppDatabase.getInstance(requireContext())
+            val existingEntries = db.friendsFlightsDao().getFlightsByFriendCode(friendCode)
+
+            var shouldUpdate = false
+
+            for (entry in fetchedEntries) {
+                if (entry.activity == "Sign on") continue
+
+                val existingFlight = existingEntries.firstOrNull { it.atd == entry.atd && it.activity == entry.activity }
+
+                if (existingFlight != null) {
+                    // Compare the fetched entry with the existing one
+                    if (existingFlight.ata != entry.ata ||
+                        existingFlight.checkIn != entry.checkIn ||
+                        existingFlight.checkOut != entry.checkOut ||
+                        existingFlight.date != entry.date ||
+                        existingFlight.dd != entry.dd ||
+                        existingFlight.dest != entry.dest ||
+                        existingFlight.orig != entry.orig
+                    ) {
+                        // Update existing entry (ensure the friendCode is retained)
+                        val updatedFlight = existingFlight.copy(
+                            ata = entry.ata,
+                            checkIn = entry.checkIn,
+                            checkOut = entry.checkOut,
+                            date = entry.date,
+                            dd = entry.dd,
+                            dest = entry.dest,
+                            orig = entry.orig,
+                            friendCode = friendCode // Ensure friendCode is set properly
+                        )
+
+                        db.friendsFlightsDao().insertAll(listOf(updatedFlight))
+                        shouldUpdate = true
+                    }
+                } else {
+                    // Insert new flight if it doesn't exist in the database
+                    val newFlight = entry.copy(friendCode = friendCode)
+                    db.friendsFlightsDao().insertAll(listOf(newFlight))
+                    shouldUpdate = true
+                }
+            }
+
+            // If updates were made, refresh the UI
+            if (shouldUpdate) {
+                withContext(Dispatchers.Main) {
+                    // Convert FriendsFlights to DbData before displaying
+                    val dbDataEntries = fetchedEntries.map { convertFriendsFlightsToDbData(it) }
+                    updateRecyclerView(dbDataEntries, useHomeTime = false)
+                    Toast.makeText(requireContext(), "Friend roster updated", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // Convert FriendsFlights to DbData for display in RecyclerView
+    private fun convertFriendsFlightsToDbData(flight: FriendsFlights): DbData {
+        return DbData(
+            dd = flight.dd ?: "",
+            date = flight.date,
+            activity = flight.activity,
+            checkIn = flight.checkIn ?: "",
+            atd = flight.atd,
+            dest = flight.dest,
+            orig = flight.orig,
+            ata = flight.ata ?: "",
+            checkOut = flight.checkOut ?: "",
+            ac = ""
+        )
+    }
 
     // ---------------------------------------- Core Functions  -------------------------------------------------------------------- //
 
@@ -347,13 +411,6 @@ class FragmentRoster : Fragment() {
         globalFriendCode = null
     }
 
-    fun resetFriendMode() {
-        GlobalVariables.globalFriendUserID = null
-        GlobalVariables.globalFriendCode = null
-        GlobalVariables.globalFriendName = null
-        GlobalVariables.isFriendMode = false
-    }
-
     private fun parseDate(dateString: String): Date? {
         return try {
             val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
@@ -373,4 +430,24 @@ class FragmentRoster : Fragment() {
             dateFormatter.format(date)
         } ?: ""
     }
+
+    // Convert FriendsFlights to DbData.  What a fuckin pain.
+    private fun convertFriendsFlightsToDbData(friendsFlights: List<FriendsFlights>): List<DbData> {
+        return friendsFlights.map { friendFlight ->
+            DbData(
+                id = 0,  // Use 0 or any default as the ID will be autogenerated
+                dd = friendFlight.dd ?: "",
+                date = friendFlight.date,
+                activity = friendFlight.activity,
+                checkIn = friendFlight.checkIn ?: "",
+                atd = friendFlight.atd,
+                dest = friendFlight.dest,
+                orig = friendFlight.orig,
+                ata = friendFlight.ata ?: "",
+                checkOut = friendFlight.checkOut ?: "",
+                ac = ""
+            )
+        }
+    }
+
 }

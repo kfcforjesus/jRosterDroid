@@ -93,7 +93,6 @@ class RosterAdapter(
         return false
     }
 
-
     private fun getDateForPosition(position: Int): String {
         var currentPos = 0
         for (date in sortedDates) {
@@ -118,7 +117,7 @@ class RosterAdapter(
     // Handle date display on the Table
     class DateViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val dateTextView: TextView = itemView.findViewById(R.id.rosterDate)
-        private val wdoTextView: TextView = itemView.findViewById(R.id.wdoTextView) // TextView for "WDO" indicator
+        private val wdoTextView: TextView = itemView.findViewById(R.id.wdoTextView)
 
         // Modify the bind function to properly format and display the date based on ATD
         fun bind(
@@ -149,7 +148,7 @@ class RosterAdapter(
             }
             val localDate = atdDate?.let { localDateFormat.format(it) } ?: "Invalid Date"
 
-            // Get today's date in local time for comparison
+            // Get todays date in local time for comparison
             val today = Calendar.getInstance(timeZoneForATD).apply {
                 set(Calendar.HOUR_OF_DAY, 0)
                 set(Calendar.MINUTE, 0)
@@ -365,6 +364,7 @@ class RosterAdapter(
                 "ETG" to "ETOP Gnd Training",
                 "FGT" to "Failed Gnd Training",
                 "G03" to "Command Upgrade GS",
+                "G04" to "Command Upgrade GS",
                 "GS" to "Ground School",
                 "GA3" to "GA3 - Gnd Training",
                 "ADM" to "Admin"

@@ -15,6 +15,6 @@ data class FriendsFlights(
     val date: String,
     val dd: String?,
     val dest: String,
-    val friendCode: String,  // Foreign key-like column
+    val friendCode: String,
     val orig: String
 )

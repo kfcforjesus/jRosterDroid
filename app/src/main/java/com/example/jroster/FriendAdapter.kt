@@ -10,7 +10,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 
-class FriendAdapter(private var friendList: List<Friend>, private val onFriendSelectedCallback: () -> Unit) : RecyclerView.Adapter<FriendAdapter.FriendViewHolder>() {
+class FriendAdapter(
+    private var friendList: List<Friend>,
+    private val onFriendSelectedCallback: () -> Unit,
+    private val onDeleteFriendCallback: (Friend) -> Unit // Add a delete callback
+) : RecyclerView.Adapter<FriendAdapter.FriendViewHolder>() {
 
     private var selectedPosition = -1
 
@@ -37,6 +41,11 @@ class FriendAdapter(private var friendList: List<Friend>, private val onFriendSe
             // Callback to notify FragmentFriends of selection
             onFriendSelectedCallback()
         }
+
+        // Set click listener for the delete icon
+        holder.deleteIcon.setOnClickListener {
+            onDeleteFriendCallback(friend)
+        }
     }
 
     override fun getItemCount(): Int = friendList.size
@@ -56,7 +65,7 @@ class FriendAdapter(private var friendList: List<Friend>, private val onFriendSe
 
     class FriendViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val friendNameTextView: TextView = itemView.findViewById(R.id.friendName)
-        private val deleteIcon: ImageView = itemView.findViewById(R.id.deleteIcon)
+        val deleteIcon: ImageView = itemView.findViewById(R.id.deleteIcon) // Make it accessible
 
         fun bind(friend: Friend, isSelected: Boolean) {
             friendNameTextView.text = friend.name
@@ -74,4 +83,5 @@ class FriendAdapter(private var friendList: List<Friend>, private val onFriendSe
         }
     }
 }
+
 

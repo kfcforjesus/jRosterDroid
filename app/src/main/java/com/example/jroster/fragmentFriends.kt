@@ -26,6 +26,11 @@ import retrofit2.Response
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 
 class FragmentFriends : Fragment() {
 
@@ -48,11 +53,16 @@ class FragmentFriends : Fragment() {
         addFriendButton = view.findViewById(R.id.addFriendButton)
         friendCodeInput = view.findViewById(R.id.friendCodeInput)
         optionBox = view.findViewById(R.id.optionBox)
-        viewRosterButton = view.findViewById(R.id.viewRosterButton) //
+        viewRosterButton = view.findViewById(R.id.viewRosterButton)
 
         // Set up RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        friendAdapter = FriendAdapter(listOf()) { onFriendSelected() } // Pass callback for friend selection
+        friendAdapter = FriendAdapter(
+            listOf(),
+            onFriendSelectedCallback = { onFriendSelected() },
+            onDeleteFriendCallback = { friend -> deleteFriend(friend) }
+        )
+
         recyclerView.adapter = friendAdapter
 
         // Set up Add Friend Button Listener
@@ -167,6 +177,30 @@ class FragmentFriends : Fragment() {
                 Toast.makeText(requireContext(), "Friend added successfully", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // Delete a friend from Rooms
+    private fun deleteFriend(friend: Friend) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Delete Friend")
+            .setMessage("Are you sure you want to delete ${friend.name}?")
+            .setPositiveButton("Yes") { dialog, _ ->
+                // Delete friend from the database
+                CoroutineScope(Dispatchers.IO).launch {
+                    val db = AppDatabase.getInstance(requireContext())
+                    db.friendDao().deleteFriend(friend.friendCode)
+
+                    withContext(Dispatchers.Main) {
+                        // Reload RecyclerView after deletion
+                        updateRecyclerView()
+                        Toast.makeText(requireContext(), "${friend.name} deleted", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("No") { dialog, _ -> dialog.dismiss() }
+            .create()
+            .show()
     }
 
     // Update RecyclerView with data from Room database
