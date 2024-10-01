@@ -1,17 +1,27 @@
 package com.example.jroster
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.jroster.GlobalVariables.globalFriendCode
+import com.example.jroster.GlobalVariables.globalFriendName
+import com.example.jroster.GlobalVariables.globalFriendUserID
+import com.example.jroster.GlobalVariables.isFriendMode
 import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +37,9 @@ class FragmentRoster : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var rosterAdapter: RosterAdapter
+    private lateinit var rosterTitle: TextView
+    private lateinit var segmentSwitch: ZiresSwitchSegmentedControl
+    private lateinit var exitButton: Button
     private val wdoDates: MutableSet<String> = mutableSetOf()
 
     var shouldScrollToClosestDate = true
@@ -39,6 +52,19 @@ class FragmentRoster : Fragment() {
 
         // Initialize RecyclerView
         recyclerView = view.findViewById(R.id.rosterRecyclerView)
+        rosterTitle = view.findViewById(R.id.rosterTitle)
+        segmentSwitch = view.findViewById(R.id.zires_switch)
+        exitButton = view.findViewById(R.id.exitButton)
+
+        // Exit Friend Button
+        exitButton.setOnClickListener {
+
+            // End friend mode
+            disableFriendMode()
+
+            // Load users data
+            populateRoster()
+        }
 
         // Divider
         val dividerDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.divider)
@@ -49,56 +75,55 @@ class FragmentRoster : Fragment() {
         // Set the LayoutManager for the RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        // Fetch userID and passCode from SharedPreferences
+        // Detect if we are in friend mode using the GlobalVariables object
+        if (isFriendMode()) {
+
+            // Fetch and display the friend's roster
+            val friendUserID = globalFriendUserID
+            val friendCode = globalFriendCode
+            val friendName = globalFriendName
+
+            // Set the title
+            rosterTitle.setText(friendName)
+            rosterTitle.setTextColor(Color.RED)
+
+            // Remove the time toggle
+            segmentSwitch.isVisible = false
+            exitButton.isVisible = true
+
+
+            if (friendUserID != null && friendCode != null) {
+                fetchFriendRoster(friendUserID, friendCode)
+            } else {
+                Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+
+           // Load users data
+           populateRoster()
+        }
+
+        return view
+    }
+
+    // ---------------------------------------- Functions to handle the user -------------------------------------------------------------------- //
+
+    // Populate the recycleview with users shit
+    private fun populateRoster() {
+
+        // Set the title
+        rosterTitle.setText("My Roster")
+        rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
+
+        // Reinstate the time toggle
+        segmentSwitch.isVisible = true
+        exitButton.isGone = true
+
+        // Fetch and display the current user's roster
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
         val userID = sharedPreferences.getString("userID", "123")
         val passCode = sharedPreferences.getString("passCode", "456")
-
-        // Users home base
-        val savedBase = sharedPreferences.getString("base", "Melbourne")
-
-        // Retrieve saved switch state
         val switchState = sharedPreferences.getBoolean("switch_state", false)
-
-        // Find and set the initial switch state
-        val switchSegmentedControl: ZiresSwitchSegmentedControl = view.findViewById(R.id.zires_switch)
-        switchSegmentedControl.setChecked(switchState)
-
-        // Display users base
-        switchSegmentedControl.setRightToggleText(savedBase!!)
-
-        // Capture scroll position and offset
-        val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-
-        // Set listener to handle switch toggle
-        switchSegmentedControl.setOnToggleSwitchChangeListener(object : ZiresSwitchSegmentedControl.OnSwitchChangeListener {
-            override fun onToggleSwitchChangeListener(isChecked: Boolean) {
-                val correctedState = !isChecked
-
-                // Save the corrected state to SharedPreferences
-                sharedPreferences.edit().putBoolean("switch_state", correctedState).apply()
-
-                // Capture the current scroll position and offset
-                val currentPosition = layoutManager.findFirstVisibleItemPosition()
-                val view = layoutManager.findViewByPosition(currentPosition)
-                val offset = view?.top ?: 0
-
-                // Update the adapter's time zone state
-                rosterAdapter.useHomeTime = correctedState
-
-                // Notify only the visible items of the change without resetting the entire view
-                val visibleItemCount = layoutManager.childCount
-                val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
-
-                // Notify only the range of visible items
-                rosterAdapter.notifyItemRangeChanged(firstVisibleItemPosition, visibleItemCount)
-
-                // Restore the scroll position and offset
-                recyclerView.post {
-                    layoutManager.scrollToPositionWithOffset(currentPosition, offset)
-                }
-            }
-        })
 
         // Fetch and display data from the database first
         CoroutineScope(Dispatchers.IO).launch {
@@ -116,60 +141,22 @@ class FragmentRoster : Fragment() {
             // Then fetch new data from the network
             fetchRosterData(userID.toString(), passCode.toString(), switchState)
         }
-
-        return view
     }
 
-    // Fetch roster data from MySQL
-    fun fetchRosterData(userID: String, passCode: String, useHomeTime: Boolean) {
-        // Prepare API call
+    // Normal user roster fetching
+    private fun fetchRosterData(userID: String, passCode: String, useHomeTime: Boolean) {
         val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
 
-        // Queue the API call
         call.enqueue(object : Callback<List<DbData>> {
             override fun onResponse(call: Call<List<DbData>>, response: Response<List<DbData>>) {
                 if (response.isSuccessful) {
                     val rosterData = response.body()
 
-                    // Check if rosterData is not null
                     rosterData?.let { data ->
-                        // Ensure the fragment is still attached to the view and context, was crashing before.
                         if (view != null && isAdded) {
                             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                                val updatedRosterEntries = data.map { entry ->
-                                    // Unix epoch for null
-                                    val unixEpoch = "1970-01-01 00:00:00"
-                                    val defaultAc = "320"
-
-                                    DbData(
-                                        dd = entry.dd,
-                                        date = entry.date,
-                                        activity = entry.activity,
-                                        checkIn = entry.checkIn ?: unixEpoch,
-                                        orig = entry.orig,
-                                        atd = entry.atd ?: unixEpoch,
-                                        dest = entry.dest,
-                                        ata = entry.ata ?: unixEpoch,
-                                        checkOut = entry.checkOut ?: unixEpoch,
-                                        ac = entry.ac ?: defaultAc
-                                    )
-                                }
-
-                                // Insert the processed data into the Room database after clearing it
-                                val db = AppDatabase.getInstance(requireContext())
-
-                                // Clear the database before inserting the new data
-                                db.dbDataDao().deleteAll()
-
-                                // Insert all new entries into the database
-                                db.dbDataDao().insertAll(updatedRosterEntries)
-
-                                // Process entries for Sign On before updating the UI
-                                val processedEntries = processEntriesForSignOn(updatedRosterEntries)
-
-                                // Switch back to Main dispatcher for UI update
+                                val processedEntries = processEntriesForSignOn(data)
                                 withContext(Dispatchers.Main) {
-                                    // Check attachment again
                                     if (isAdded && view != null) {
                                         updateRecyclerView(processedEntries, useHomeTime)
                                     }
@@ -177,13 +164,11 @@ class FragmentRoster : Fragment() {
                             }
                         }
                     } ?: run {
-                        // Show a Toast if there are no records and the view is still available
                         if (isAdded && view != null) {
                             Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
-                    // Handle the error case if the view is still available
                     if (isAdded && view != null) {
                         Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
                     }
@@ -191,7 +176,6 @@ class FragmentRoster : Fragment() {
             }
 
             override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
-                // Show a Toast if there is a failure and the view is still available
                 if (isAdded && view != null) {
                     Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
                 }
@@ -199,37 +183,78 @@ class FragmentRoster : Fragment() {
         })
     }
 
+    // ---------------------------------------- Handle Friends  -------------------------------------------------------------------- //
+
+    // Fetch the friend's roster data ROOMS DB
+    private fun fetchFriendRoster(userID: String, friendCode: String) {
+        val call = RetrofitClient.rosterApiService.getFriendRosterData(userID, friendCode)
+
+        // Queue the API call
+        call.enqueue(object : Callback<List<DbData>> {
+            override fun onResponse(call: Call<List<DbData>>, response: Response<List<DbData>>) {
+                if (response.isSuccessful) {
+                    val friendRosterData = response.body()
+
+                    // Check if friendRosterData is not null
+                    friendRosterData?.let { data ->
+                        if (view != null && isAdded) {
+                            // Update the RecyclerView
+                            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                                val processedEntries = processEntriesForSignOn(data)
+                                withContext(Dispatchers.Main) {
+                                    if (isAdded && view != null) {
+                                        updateRecyclerView(processedEntries, useHomeTime = false)
+                                    }
+                                }
+                            }
+                        }
+                    } ?: run {
+                        if (isAdded && view != null) {
+                            Toast.makeText(requireContext(), "No records found for this friend", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    if (isAdded && view != null) {
+                        Toast.makeText(requireContext(), "Failed to fetch friend's roster data", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
+                if (isAdded && view != null) {
+                    Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+    }
+
+
+    // ---------------------------------------- Core Functions  -------------------------------------------------------------------- //
+
     // Process Sign On duties
     fun processEntriesForSignOn(rosterEntries: List<DbData>): List<DbData> {
         val updatedEntries = mutableListOf<DbData>()
         val seenCheckInTimesByDate = mutableMapOf<String, MutableSet<Date>>()
 
-        // Define the cutoff date (January 1, 1980)
         val cutoffDate = Calendar.getInstance().apply {
             set(1980, Calendar.JANUARY, 1, 0, 0, 0)
         }.time
 
         for (entry in rosterEntries) {
-            // Ensure there's a set for each date to track seen check-in times
             if (seenCheckInTimesByDate[entry.date] == null) {
                 seenCheckInTimesByDate[entry.date] = mutableSetOf()
             }
 
-            // Check for WDO-related activities and skip adding a "Sign on" for them
             if (listOf("WDO", "WDA", "WDT", "WDE").contains(entry.activity)) {
                 wdoDates.add(entry.date)
                 continue
             }
 
-            // Check if check-in is after the cutoff date (January 1, 1980)
             val checkInDate = entry.checkIn?.let { parseDate(it) }
             if (checkInDate != null && checkInDate.after(cutoffDate)) {
-                // Check if the check-in time is not already seen for this date and not the same as atd
                 val atdDate = entry.atd?.let { parseDate(it) }
                 if (!seenCheckInTimesByDate[entry.date]!!.contains(checkInDate) && checkInDate != atdDate) {
                     seenCheckInTimesByDate[entry.date]!!.add(checkInDate)
-
-                    // Create a new "Sign on" entry
                     val signOnEntry = DbData(
                         activity = "Sign on",
                         ata = null.toString(),
@@ -245,33 +270,25 @@ class FragmentRoster : Fragment() {
                     updatedEntries.add(signOnEntry)
                 }
             }
-
-            // Add the original entry
             updatedEntries.add(entry)
         }
-
         return updatedEntries
     }
 
+    // ---------------------------------------- RecyclerView Function  -------------------------------------------------------------------- //
+
     fun updateRecyclerView(rosterData: List<DbData>, useHomeTime: Boolean) {
-        // Organize roster data by date
         val entriesByDate = rosterData.groupBy { it.date }
         val sortedDates = entriesByDate.keys.sorted()
 
-        // Create an instance of extAirports
         val extAirportsInstance = extAirports()
 
-        // Retrieve the saved base value from SharedPreferences
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
         val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
 
-        // Set up the adapter with the grouped data
         rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
-
-        // Set the adapter for the RecyclerView
         recyclerView.adapter = rosterAdapter
 
-        // Conditionally scroll to the closest date
         if (shouldScrollToClosestDate) {
             scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
         }
@@ -287,13 +304,12 @@ class FragmentRoster : Fragment() {
         calendar.add(Calendar.DAY_OF_YEAR, 0)
         val yesterday = calendar.time
 
-        // Standard formatter
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         dateFormatter.timeZone = TimeZone.getTimeZone("UTC")
 
         var closestDateIndex: Int? = null
         var smallestTimeInterval: Long = Long.MAX_VALUE
-        var currentIndex = 0 // Keeps track of the overall index (date header + duties)
+        var currentIndex = 0
 
         for (i in sortedDates.indices) {
             val dateString = sortedDates[i]
@@ -308,17 +324,36 @@ class FragmentRoster : Fragment() {
                 }
             }
 
-            currentIndex++  // Add 1 for the date header
-            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0 // Add the number of duties for this date
+            currentIndex++
+            currentIndex += entriesByDate[sortedDates[i]]?.size ?: 0
         }
 
-        // Scroll to the closest date index if found
         closestDateIndex?.let {
             recyclerView.scrollToPosition(it)
         }
     }
 
-    // Helper function to parse date string into Date object in UTC
+    // ---------------------------------------- Boiler plate  -------------------------------------------------------------------- //
+
+    // Check if we are in friend mode
+    private fun isFriendMode(): Boolean {
+        return isFriendMode && globalFriendUserID != null && globalFriendCode != null
+    }
+
+    // Disable Friend Mode
+    private fun disableFriendMode() {
+        isFriendMode = false
+        globalFriendUserID = null
+        globalFriendCode = null
+    }
+
+    fun resetFriendMode() {
+        GlobalVariables.globalFriendUserID = null
+        GlobalVariables.globalFriendCode = null
+        GlobalVariables.globalFriendName = null
+        GlobalVariables.isFriendMode = false
+    }
+
     private fun parseDate(dateString: String): Date? {
         return try {
             val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
@@ -330,7 +365,6 @@ class FragmentRoster : Fragment() {
         }
     }
 
-    // Helper function to format Date object into string in UTC (yyyy-MM-dd HH:mm:ss)
     private fun formatDate(date: Date?): String {
         return date?.let {
             val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {

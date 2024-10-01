@@ -43,6 +43,19 @@
         app:layout_constraintTop_toBottomOf="@id/rosterTitle"
         tools:listitem="@layout/duty_row_layout" />
 
+    <Button
+        android:id="@+id/exitButton"
+        android:layout_width="180dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="16dp"
+        android:backgroundTint="#6A5ACD"
+        android:text="Exit Friend Mode"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:visibility="gone"
+        />
+
     <com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
         android:id="@+id/zires_switch"
         android:layout_width="wrap_content"

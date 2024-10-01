@@ -10,10 +10,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 
-class FriendAdapter(
-    private var friendList: List<Friend>,
-    private val onFriendSelected: () -> Unit // Callback for when a friend is selected
-) : RecyclerView.Adapter<FriendAdapter.FriendViewHolder>() {
+class FriendAdapter(private var friendList: List<Friend>, private val onFriendSelectedCallback: () -> Unit) : RecyclerView.Adapter<FriendAdapter.FriendViewHolder>() {
 
     private var selectedPosition = -1
 
@@ -23,7 +20,7 @@ class FriendAdapter(
     }
 
     override fun onBindViewHolder(holder: FriendViewHolder, position: Int) {
-        val friend = friendList[holder.adapterPosition] // Use holder.adapterPosition
+        val friend = friendList[holder.adapterPosition]
         holder.bind(friend, holder.adapterPosition == selectedPosition)
 
         // Set click listener for the item
@@ -37,8 +34,8 @@ class FriendAdapter(
             }
             notifyItemChanged(selectedPosition)
 
-            // Call the callback to show the optionBox in the fragment
-            onFriendSelected()
+            // Callback to notify FragmentFriends of selection
+            onFriendSelectedCallback()
         }
     }
 
@@ -47,6 +44,14 @@ class FriendAdapter(
     fun updateData(newFriendList: List<Friend>) {
         friendList = newFriendList
         notifyDataSetChanged()
+    }
+
+    fun getSelectedFriend(): Friend? {
+        return if (selectedPosition != -1) {
+            friendList[selectedPosition]
+        } else {
+            null
+        }
     }
 
     class FriendViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -69,3 +74,4 @@ class FriendAdapter(
         }
     }
 }
+
