@@ -105,6 +105,9 @@ class FragmentRoster : Fragment() {
             segmentSwitch.isVisible = true
             exitButton.isGone = true
 
+            // Set isFirstLoad to true to trigger the scroll to today's date
+            isFirstLoad = true
+
             // Get userID and passCode from sharedPreferences
             val userID = sharedPreferences.getString("userID", "123")
             val passCode = sharedPreferences.getString("passCode", "456")
@@ -237,7 +240,6 @@ class FragmentRoster : Fragment() {
 
                             // Ensure the UI is updated with friend's data
                             updateRecyclerView(processedEntries, useHomeTime = false, isFriendMode = true)
-                            Log.d("Friend", processedEntries.toString())
                         }
                     }
                 } else {
