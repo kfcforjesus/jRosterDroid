@@ -40,6 +40,7 @@ class FragmentRoster : Fragment() {
     private lateinit var rosterTitle: TextView
     private lateinit var segmentSwitch: ZiresSwitchSegmentedControl
     private lateinit var exitButton: Button
+    private var isFirstLoad = true
     private val wdoDates: MutableSet<String> = mutableSetOf()
 
     var shouldScrollToClosestDate = true
@@ -358,11 +359,25 @@ class FragmentRoster : Fragment() {
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
         val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
 
-        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
-        recyclerView.adapter = rosterAdapter
+        // Save the current scroll position if it's not the first load
+        val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+        val currentScrollPosition = if (!isFirstLoad) layoutManager.findFirstVisibleItemPosition() else -1
 
-        if (shouldScrollToClosestDate) {
+        // Initialize or update the adapter
+        if (::rosterAdapter.isInitialized) {
+            rosterAdapter.updateData(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
+        } else {
+            rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
+            recyclerView.adapter = rosterAdapter
+        }
+
+        if (isFirstLoad) {
+            // Scroll to today's date on first load
             scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
+            isFirstLoad = false  // Set flag to false after the first load
+        } else if (currentScrollPosition >= 0) {
+            // Restore the previous scroll position after updating the data
+            recyclerView.scrollToPosition(currentScrollPosition)
         }
     }
 

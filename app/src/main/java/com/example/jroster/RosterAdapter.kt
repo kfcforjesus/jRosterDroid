@@ -17,9 +17,9 @@ import java.util.Locale
 import java.util.TimeZone
 
 class RosterAdapter(
-    private val sortedDates: List<String>,
-    private val entriesByDate: Map<String, List<DbData>>,
-    private val extAirports: extAirports,
+    private var sortedDates: List<String>,
+    private var entriesByDate: Map<String, List<DbData>>,
+    private var extAirports: extAirports,
     var useHomeTime: Boolean,
     private val userBase: String,
     private val wdoDates: Set<String>
@@ -27,6 +27,21 @@ class RosterAdapter(
 
     private val VIEW_TYPE_DATE_HEADER = 0
     private val VIEW_TYPE_ROSTER_ENTRY = 1
+
+    // Add the updateData method to update the adapter's data
+    fun updateData(
+        newSortedDates: List<String>,
+        newEntriesByDate: Map<String, List<DbData>>,
+        extAirportsInstance: extAirports,
+        useHomeTimeValue: Boolean,
+        savedBase: String,
+        wdoDatesSet: Set<String>
+    ) {
+        sortedDates = newSortedDates
+        entriesByDate = newEntriesByDate
+        useHomeTime = useHomeTimeValue
+        notifyDataSetChanged()
+    }
 
     override fun getItemViewType(position: Int): Int {
         return if (isPositionDateHeader(position)) VIEW_TYPE_DATE_HEADER else VIEW_TYPE_ROSTER_ENTRY
@@ -93,14 +108,28 @@ class RosterAdapter(
         return false
     }
 
-    private fun getDateForPosition(position: Int): String {
+    fun getPositionForDate(date: String): Int {
+        var currentPos = 0
+        for (sortedDate in sortedDates) {
+            if (sortedDate == date) {
+                return currentPos
+            }
+            currentPos += 1 + (entriesByDate[sortedDate]?.size ?: 0)
+        }
+        return 0  // Default to the first position if the date is not found
+    }
+
+    // This should be inside your RosterAdapter class
+    fun getDateForPosition(position: Int): String {
         var currentPos = 0
         for (date in sortedDates) {
             if (position == currentPos) return date
             currentPos += 1 + (entriesByDate[date]?.size ?: 0)
         }
-        return ""
+        return "" // Return empty string if position is not found
     }
+
+
 
     private fun getEntryForPosition(position: Int): DbData? {
         var currentPos = 0
