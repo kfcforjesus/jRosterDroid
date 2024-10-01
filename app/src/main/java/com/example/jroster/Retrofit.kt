@@ -7,7 +7,7 @@ import retrofit2.http.POST
 
 interface RosterApiService {
 
-    // Define the POST request for fetching roster data for the current user
+    // Fetch user's own roster, returns List<DbData>
     @FormUrlEncoded
     @POST("fetchRoster.php")
     fun getRosterData(
@@ -15,11 +15,11 @@ interface RosterApiService {
         @Field("passCode") passCode: String
     ): Call<List<DbData>>
 
-    // Define the POST request for fetching friend's roster data
+    // Fetch friend's roster, returns List<FriendsFlights>
     @FormUrlEncoded
     @POST("fetchFriendRoster.php")
     fun getFriendRosterData(
-        @Field("userID") userID: String,
+        @Field("userID") friendUserID: String,
         @Field("friendCode") friendCode: String
-    ): Call<List<DbData>>
+    ): Call<List<FriendsFlights>>
 }
