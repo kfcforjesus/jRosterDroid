@@ -123,6 +123,7 @@
                 android:layout_marginStart="1dp"
                 android:spinnerMode="dropdown"
                 android:entries="@array/base_array"
+                style="@style/CustomSpinnerStyle"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toEndOf="@id/baseLabel"
                 android:visibility="visible" /> <!-- Make sure visibility is handled properly -->

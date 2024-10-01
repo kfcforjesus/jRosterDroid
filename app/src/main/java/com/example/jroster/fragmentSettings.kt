@@ -462,5 +462,4 @@ class FragmentSettings : Fragment() {
             syncLabel.text = "Not Synced"
         }
     }
-
 }

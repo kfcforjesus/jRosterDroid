@@ -10,6 +10,27 @@
 
     </style>
 
+    <!-- Spinner formatting -->
+    <style name="CustomSpinnerStyle" parent="Widget.AppCompat.Spinner">
+        <item name="android:background">@android:color/white</item>
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:popupBackground">@android:color/white</item>
+    </style>
+
+    <!-- Alert boxes -->
+    <style name="CustomAlertDialogStyle" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:background">@android:color/white</item>
+        <item name="android:textColorPrimary">@android:color/black</item>
+        <item name="android:buttonBarPositiveButtonStyle">@style/CustomDialogButton</item>
+        <item name="android:buttonBarNegativeButtonStyle">@style/CustomDialogButton</item>
+        <item name="android:buttonBarNeutralButtonStyle">@style/CustomDialogButton</item>
+    </style>
+
+    <!-- Custom button style for dialog buttons -->
+    <style name="CustomDialogButton" parent="Widget.AppCompat.Button">
+        <item name="android:textColor">@android:color/black</item>
+    </style>
+
     <!-- Define text style for BottomNavigationView items -->
     <style name="BottomNavTextStyle">
         <item name="android:textSize">14sp</item>

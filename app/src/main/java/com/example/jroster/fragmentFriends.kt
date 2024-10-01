@@ -326,7 +326,7 @@ class FragmentFriends : Fragment() {
 
     // Delete a friend from Rooms
     private fun deleteFriend(friend: Friend) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.CustomAlertDialogStyle)
             .setTitle("Delete Friend")
             .setMessage("Are you sure you want to delete ${friend.name}?")
             .setPositiveButton("Yes") { dialog, _ ->
@@ -347,6 +347,7 @@ class FragmentFriends : Fragment() {
             .create()
             .show()
     }
+
 
     // Update RecyclerView with data from Room database
     private fun updateRecyclerView() {
@@ -370,7 +371,7 @@ class FragmentFriends : Fragment() {
 
     // Show alert dialog for errors
     private fun showAlertDialog(title: String, message: String) {
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.CustomAlertDialogStyle)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton("OK", null)
