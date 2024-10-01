@@ -19,4 +19,6 @@ interface FriendsFlightsDao {
     @Query("SELECT * FROM friends_flights WHERE friendCode = :friendCode AND activity IN (:activities) AND date >= :fromDate")
     suspend fun getFlightsByFriendCodeAndActivityFromDate(friendCode: String, activities: List<String>, fromDate: String): List<FriendsFlights>
 
+    @Query("SELECT * FROM friends_flights")
+    fun getAll(): List<FriendsFlights>
 }

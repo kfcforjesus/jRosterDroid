@@ -28,21 +28,6 @@ class RosterAdapter(
     private val VIEW_TYPE_DATE_HEADER = 0
     private val VIEW_TYPE_ROSTER_ENTRY = 1
 
-    // Add the updateData method to update the adapter's data
-    fun updateData(
-        newSortedDates: List<String>,
-        newEntriesByDate: Map<String, List<DbData>>,
-        extAirportsInstance: extAirports,
-        useHomeTimeValue: Boolean,
-        savedBase: String,
-        wdoDatesSet: Set<String>
-    ) {
-        sortedDates = newSortedDates
-        entriesByDate = newEntriesByDate
-        useHomeTime = useHomeTimeValue
-        notifyDataSetChanged()
-    }
-
     override fun getItemViewType(position: Int): Int {
         return if (isPositionDateHeader(position)) VIEW_TYPE_DATE_HEADER else VIEW_TYPE_ROSTER_ENTRY
     }

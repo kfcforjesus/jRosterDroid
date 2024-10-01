@@ -72,10 +72,7 @@ class FragmentRoster : Fragment() {
         segmentSwitch.setChecked(switchState)
 
         // Fetch the current state of the segment control (local or home time) based on the switchState
-        val useHomeTime = switchState
-
-        // Populate the roster initially
-        populateRoster(useHomeTime)
+        val useHomeTime = switchState  // When the switch is unchecked (left), use local time
 
         // Listen for changes to the segment switch
         segmentSwitch.setOnToggleSwitchChangeListener(object : ZiresSwitchSegmentedControl.OnSwitchChangeListener {
@@ -97,6 +94,25 @@ class FragmentRoster : Fragment() {
             }
         })
 
+        // Exit Friend Button functionality restored
+        exitButton.setOnClickListener {
+            // End friend mode
+            disableFriendMode()
+
+            // Reload user's own roster
+            rosterTitle.text = "My Roster"
+            rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
+            segmentSwitch.isVisible = true
+            exitButton.isGone = true
+
+            // Get userID and passCode from sharedPreferences
+            val userID = sharedPreferences.getString("userID", "123")
+            val passCode = sharedPreferences.getString("passCode", "456")
+
+            // Reload the user's roster
+            fetchRosterData(userID.toString(), passCode.toString(), useHomeTime)
+        }
+
         // Check if we are in friend mode using the GlobalVariables object
         if (isFriendMode()) {
             val friendUserID = globalFriendUserID
@@ -109,8 +125,10 @@ class FragmentRoster : Fragment() {
             exitButton.isVisible = true
 
             if (friendUserID != null && friendCode != null) {
+                Log.d("Friend", "Friend mode on")
                 fetchAndUpdateFriendRoster(friendUserID, friendCode)
             } else {
+                Log.d("Friend", "Friend mode OFF")
                 Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
             }
         } else {
@@ -210,14 +228,16 @@ class FragmentRoster : Fragment() {
                     // Only update if data exists
                     fetchedEntries?.let { fetchedList ->
                         if (fetchedList.isNotEmpty()) {
+                            // Call compareAndUpdateFriendRosterData before updating the UI
                             compareAndUpdateFriendRosterData(fetchedList, friendCode)
 
-                            // Convert FriendsFlights to DbData and update the RecyclerView
+                            // Convert FriendsFlights to DbData and process them
                             val dbDataList = convertFriendsFlightsToDbData(fetchedList)
-
-                            // Add sign on duties and display
                             val processedEntries = processEntriesForSignOn(dbDataList)
-                            updateRecyclerView(processedEntries, useHomeTime = false)
+
+                            // Ensure the UI is updated with friend's data
+                            updateRecyclerView(processedEntries, useHomeTime = false, isFriendMode = true)
+                            Log.d("Friend", processedEntries.toString())
                         }
                     }
                 } else {
@@ -230,6 +250,7 @@ class FragmentRoster : Fragment() {
             }
         })
     }
+
 
     // Function to compare and update friend's flights from the fetched data
     private fun compareAndUpdateFriendRosterData(fetchedEntries: List<FriendsFlights>, friendCode: String) {
@@ -340,7 +361,7 @@ class FragmentRoster : Fragment() {
 
     // ---------------------------------------- RecyclerView Function  -------------------------------------------------------------------- //
 
-    fun updateRecyclerView(rosterData: List<DbData>, useHomeTime: Boolean) {
+    fun updateRecyclerView(rosterData: List<DbData>, useHomeTime: Boolean, isFriendMode: Boolean = false) {
         val entriesByDate = rosterData.groupBy { it.date }
         val sortedDates = entriesByDate.keys.sorted()
 
@@ -349,22 +370,18 @@ class FragmentRoster : Fragment() {
         val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
         val savedBase = sharedPreferences.getString("base", "Melbourne") ?: "Melbourne"
 
-        // Save the current scroll position if it's not the first load
+        // Save the current scroll position if it's not the first load and not in friend mode
         val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-        val currentScrollPosition = if (!isFirstLoad) layoutManager.findFirstVisibleItemPosition() else -1
+        val currentScrollPosition = if (!isFirstLoad && !isFriendMode) layoutManager.findFirstVisibleItemPosition() else -1
 
-        // Initialize or update the adapter
-        if (::rosterAdapter.isInitialized) {
-            rosterAdapter.updateData(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
-        } else {
-            rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
-            recyclerView.adapter = rosterAdapter
-        }
+        // Create a new adapter instance each time the data is updated
+        rosterAdapter = RosterAdapter(sortedDates, entriesByDate, extAirportsInstance, useHomeTime, savedBase, wdoDates)
+        recyclerView.adapter = rosterAdapter
 
         if (isFirstLoad) {
-            // Scroll to today's date on first load
+            // Scroll to today's date
             scrollToClosestDate(sortedDates, entriesByDate, recyclerView)
-            isFirstLoad = false  // Set flag to false after the first load
+            isFirstLoad = false
         } else if (currentScrollPosition >= 0) {
             // Restore the previous scroll position after updating the data
             recyclerView.scrollToPosition(currentScrollPosition)
@@ -462,5 +479,4 @@ class FragmentRoster : Fragment() {
             )
         }
     }
-
 }
