@@ -167,10 +167,10 @@ class FragmentRoster : Fragment() {
         val userID = sharedPreferences.getString("userID", "123")
         val passCode = sharedPreferences.getString("passCode", "456")
 
-        // Load data from local database first
+        // Load data from local database first (using IO thread)
         lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getInstance(requireContext())
-            val rosterEntriesFromDb = db.dbDataDao().getAll()  // Access database on the IO thread
+            val rosterEntriesFromDb = db.dbDataDao().getAll()
 
             // Process entries for Sign On
             val processedEntries = processEntriesForSignOn(rosterEntriesFromDb)
@@ -195,42 +195,51 @@ class FragmentRoster : Fragment() {
 
                     rosterData?.let { data ->
                         lifecycleScope.launch(Dispatchers.IO) {
-                            val db = AppDatabase.getInstance(requireContext())
+                            context?.let { ctx ->
+                                val db = AppDatabase.getInstance(ctx)
 
-                            // Only clear the database and insert if we get non-empty data
-                            if (data.isNotEmpty()) {
-                                db.dbDataDao().deleteAll()
-                                db.dbDataDao().insertAll(data)
+                                // Only clear the database and insert if we get non-empty data
+                                if (data.isNotEmpty()) {
+                                    db.dbDataDao().deleteAll()
+                                    db.dbDataDao().insertAll(data)
 
-                                // Reset the sync time in SharedPreferences
-                                val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
-                                val editor = sharedPreferences.edit()
-                                editor.putLong("lastSyncTime", System.currentTimeMillis())
-                                editor.apply() //
-                            }
+                                    // Reset the sync time in SharedPreferences
+                                    val sharedPreferences = ctx.getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+                                    sharedPreferences.edit()
+                                        .putLong("lastSyncTime", System.currentTimeMillis())
+                                        .apply()
+                                }
 
-                            val processedEntries = processEntriesForSignOn(data)
-                            withContext(Dispatchers.Main) {
-                                updateRecyclerView(processedEntries, useHomeTime)
-
+                                val processedEntries = processEntriesForSignOn(data)
+                                withContext(Dispatchers.Main) {
+                                    if (isAdded) {
+                                        updateRecyclerView(processedEntries, useHomeTime)
+                                    }
+                                }
                             }
                         }
                     } ?: run {
                         lifecycleScope.launch(Dispatchers.Main) {
-                            Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
+                            if (isAdded) {
+                                Toast.makeText(requireContext(), "No records found", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
 
                 } else {
                     lifecycleScope.launch(Dispatchers.Main) {
-                        Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
+                        if (isAdded) {
+                            Toast.makeText(requireContext(), "Failed to fetch data", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
 
             override fun onFailure(call: Call<List<DbData>>, t: Throwable) {
                 lifecycleScope.launch(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Offline Mode: Unable to fetch data", Toast.LENGTH_SHORT).show()
+                    if (isAdded) {
+                        Toast.makeText(requireContext(), "Offline Mode: Unable to fetch data", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         })
@@ -256,8 +265,6 @@ class FragmentRoster : Fragment() {
 
                     // Scroll to today's date after updating RecyclerView
                     scrollToClosestDate(processedEntries.groupBy { it.date }.keys.sorted(), processedEntries.groupBy { it.date }, recyclerView)
-
-                    Toast.makeText(requireContext(), "Loaded friend roster from local DB", Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -265,7 +272,6 @@ class FragmentRoster : Fragment() {
             fetchAndUpdateFriendRoster(friendUserID, friendCode)
         }
     }
-
 
     // Step 2 - Load from MySQL
     private fun fetchAndUpdateFriendRoster(friendUserID: String, friendCode: String) {
@@ -293,7 +299,7 @@ class FragmentRoster : Fragment() {
                             // Scroll to today's date after updating RecyclerView
                             scrollToClosestDate(processedEntries.groupBy { it.date }.keys.sorted(), processedEntries.groupBy { it.date }, recyclerView)
 
-                            Toast.makeText(requireContext(), "Friend roster updated from MySQL", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), "Sync Success", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
@@ -306,8 +312,6 @@ class FragmentRoster : Fragment() {
             }
         })
     }
-
-
 
     // Step 3 - Function to compare and update friend's flights from the fetched data
     private fun compareAndUpdateFriendRosterData(fetchedEntries: List<FriendsFlights>, friendCode: String) {

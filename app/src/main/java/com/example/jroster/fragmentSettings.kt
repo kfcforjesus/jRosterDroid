@@ -95,7 +95,7 @@ class FragmentSettings : Fragment() {
         // Set a click listener for the logout button
         logoutButton.setOnClickListener {
             // Confirm logout action with an alert dialog
-            AlertDialog.Builder(requireContext())
+            AlertDialog.Builder(requireContext(), R.style.CustomAlertDialogStyle)
                 .setTitle("Confirm Logout")
                 .setMessage("Are you sure you want to log out?  This action will completely reset JRoster")
                 .setPositiveButton("Yes") { _, _ ->
@@ -399,7 +399,7 @@ class FragmentSettings : Fragment() {
 
     private fun showAlert(title: String, message: String) {
         // Create an AlertDialog builder with the context of the fragment
-        val builder = AlertDialog.Builder(requireContext())
+        val builder = AlertDialog.Builder(requireContext(), R.style.CustomAlertDialogStyle)
 
         // Set the title and message of the alert dialog
         builder.setTitle(title)

@@ -652,6 +652,41 @@ class RosterAdapter(
                 val iconRes = iconMapping[activityText] ?: R.drawable.sim2 // Default airplane icon
                 flightIcon.setImageResource(iconRes)
 
+            // ------------- HANDLE GROUND DUTIES -------------------------
+            } else if (listOf("78C", "AAG", "ACE", "ACL", "APC", "BAG", "CB2", "CB3", "CB6", "CBE",
+                    "CBT", "CCA", "CCB", "CCI", "CCM", "CIP", "CMG", "CMI", "CMS", "CPG", "CR1",
+                    "D1P", "DG", "FGT", "G03", "G04", "GA4", "GA5", "GA7", "GB3", "GB8", "GS", "GSI",
+                    "GT1", "GT2", "GT3", "GT4", "HFR", "INT", "IND", "PMI", "R01", "R03", "R04",
+                    "R21", "RNG", "R02", "RQI", "TRC", "TRE", "TTC", "TTT", "ETR", "36C").contains(entry.activity)) {
+
+                var timeText = ""
+
+                if (!useHomeTime)  {
+                    timeText = "L"
+                }
+
+                // Handle other activities based on mapping
+                val activityText = activityMapping[entry.activity] ?: entry.activity
+                flightRouteTextView.text = "Ground Course"
+                flightDataTextView.text = activityText
+
+                // Reset top margin for non-"Sign On" duties
+                val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutFlight = flightTimesTextView.layoutParams as ViewGroup.MarginLayoutParams
+                val layoutIcon = flightIcon.layoutParams as ViewGroup.MarginLayoutParams
+
+                layoutIcon.topMargin = 28
+                layoutParams.topMargin = 0
+                layoutFlight.topMargin = 14
+
+                flightDataTextView.isGone = false
+
+                // Handle duty timings (ata, atd)
+                flightTimesTextView.text = "$localAtd$timeText - $localAta$timeText"
+
+                // Set the appropriate icon
+                val iconRes = iconMapping[activityText] ?: R.drawable.sim2 // Default airplane icon
+                flightIcon.setImageResource(iconRes)
 
             // -------------- HANDLE SIGN ON ONLY --------------------------------------
             } else if (entry.activity == "Sign on") {
