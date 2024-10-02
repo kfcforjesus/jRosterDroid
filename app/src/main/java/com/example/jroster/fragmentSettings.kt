@@ -4,7 +4,6 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -24,14 +23,25 @@ import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.Toast
-import androidx.core.view.isGone
-import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.PackageManager
+import android.icu.text.SimpleDateFormat
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.Uri
+import android.os.Build
+import android.provider.CalendarContract
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import java.util.*
 
 
 class FragmentSettings : Fragment() {
@@ -78,6 +88,8 @@ class FragmentSettings : Fragment() {
         // Inside your Fragment's onCreateView or onViewCreated method
         val instructionsButton = view.findViewById<Button>(R.id.instructionsButton)
 
+        // ---------------------------------------- Setup Listeners  -------------------------------------------------------------------- //
+
         // Set an OnClickListener for the button
         instructionsButton.setOnClickListener {
             // Get access to SharedPreferences
@@ -122,24 +134,10 @@ class FragmentSettings : Fragment() {
             syncLabel.text = "0 min"
         }
 
-
-        // Initialize the EditText
-        val nameEditText = view.findViewById<EditText>(R.id.nameEditText)
-
-        // Check for name in SharedPreferences
-        val storedName = sharedPreferences.getString("userName", null)
-
-        if (storedName != null) {
-            // If name exists in SharedPreferences, set it to the EditText
-            nameEditText.setText(storedName)
-        } else {
-            // If name does not exist, fetch from MySQL
-            val userID = sharedPreferences.getString("userID", "") ?: ""
-            fetchFriendDataFromMySQL(userID)
+        // When exportOnButton is selected, trigger the calendar export process
+        exportOnButton.setOnClickListener {
+            checkAndRequestCalendarPermission()
         }
-
-        // Set save button visibility to invisible initially3
-        saveButton.visibility = View.INVISIBLE
 
         // Add TextWatcher to handle save button visibility
         nameEditText.addTextChangedListener(object : android.text.TextWatcher {
@@ -164,16 +162,6 @@ class FragmentSettings : Fragment() {
             saveAction()
         }
 
-        // Load saved radio button state
-        val isExportOn = sharedPreferences.getBoolean("isExportOn", false) // Default is 'false' (Off)
-
-        // Set the radio button state based on saved value
-        if (isExportOn) {
-            exportOnButton.isChecked = true
-        } else {
-            exportOffButton.isChecked = true
-        }
-
         // Set a listener for the radio button group to save changes
         exportRadioGroup.setOnCheckedChangeListener { _, checkedId ->
             val editor = sharedPreferences.edit()
@@ -186,6 +174,38 @@ class FragmentSettings : Fragment() {
                 }
             }
             editor.apply() // Save the changes
+        }
+
+        // ---------------------------------------- Var Setup  -------------------------------------------------------------------- //
+
+        // Initialize the EditText
+        val nameEditText = view.findViewById<EditText>(R.id.nameEditText)
+
+        // Check for name in SharedPreferences
+        val storedName = sharedPreferences.getString("userName", null)
+
+        if (storedName != null) {
+            // If name exists in SharedPreferences, set it to the EditText
+            nameEditText.setText(storedName)
+        } else {
+            // If name does not exist, fetch from MySQL
+            val userID = sharedPreferences.getString("userID", "") ?: ""
+            fetchFriendDataFromMySQL(userID)
+        }
+
+        // Set save button visibility to invisible initially3
+        saveButton.visibility = View.INVISIBLE
+
+
+
+        // Load saved radio button state
+        val isExportOn = sharedPreferences.getBoolean("isExportOn", false) // Default is 'false' (Off)
+
+        // Set the radio button state based on saved value
+        if (isExportOn) {
+            exportOnButton.isChecked = true
+        } else {
+            exportOffButton.isChecked = true
         }
 
         // Initialize the base Spinner
@@ -224,6 +244,141 @@ class FragmentSettings : Fragment() {
 
         return view
     }
+
+    // ---------------------------------------- Calendar Functions  -------------------------------------------------------------------- //
+
+    // Handle the result of the permission request
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == 100) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                exportDutiesToGoogleCalendar()
+            } else {
+                Toast.makeText(requireContext(), "Calendar permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun exportDutiesToGoogleCalendar() {
+        val eventUriString = "content://com.android.calendar/events"
+        val calendarId: Long = getPrimaryCalendarId()
+
+        if (calendarId == -1L) {
+            Toast.makeText(requireContext(), "No calendar available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Fetch all DbData (your flight data) from the Room database
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.getInstance(requireContext())
+            val flights = db.dbDataDao().getAll() // Replace with your actual method for fetching all flights
+
+            withContext(Dispatchers.Main) {
+                // Loop through each flight and add events to the calendar
+                for (flight in flights) {
+                    // Parse ATD (Actual Time of Departure) from string to Date
+                    val atdDate = parseDate(flight.atd)
+                    val ataDate = parseDate(flight.ata)
+
+                    // Check if ATD exists
+                    atdDate?.let { atd ->
+                        // Create flight event
+                        val flightEventValues = ContentValues().apply {
+                            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                            put(CalendarContract.Events.TITLE, flight.activity)
+                            put(CalendarContract.Events.DTSTART, atd.time)
+                            put(CalendarContract.Events.DTEND, ataDate?.time ?: atd.time + 3600000) // Default to 1-hour duration if ATA is not available
+                            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+                            put(CalendarContract.Events.DESCRIPTION, "${flight.orig} to ${flight.dest}")
+                        }
+                        requireContext().contentResolver.insert(Uri.parse(eventUriString), flightEventValues)
+                    }
+
+                    // Optional: Add sign-on event
+                    val checkInDate = parseDate(flight.checkIn)
+                    checkInDate?.let {
+                        val signOnValues = ContentValues().apply {
+                            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                            put(CalendarContract.Events.TITLE, "Sign On")
+                            put(CalendarContract.Events.DTSTART, it.time)
+                            put(CalendarContract.Events.DTEND, it.time + 3600000) // 1 hour
+                            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+                        }
+                        requireContext().contentResolver.insert(Uri.parse(eventUriString), signOnValues)
+                    }
+
+                    // Optional: Add sign-off event
+                    val checkOutDate = parseDate(flight.checkOut)
+                    checkOutDate?.let {
+                        val signOffValues = ContentValues().apply {
+                            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                            put(CalendarContract.Events.TITLE, "Sign Off")
+                            put(CalendarContract.Events.DTSTART, it.time)
+                            put(CalendarContract.Events.DTEND, it.time + 3600000) // 1 hour
+                            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+                        }
+                        requireContext().contentResolver.insert(Uri.parse(eventUriString), signOffValues)
+                    }
+                }
+
+                Toast.makeText(requireContext(), "Duties exported to Google Calendar", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Helper function to parse date strings
+    private fun parseDate(dateString: String): Date? {
+        return try {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            dateFormat.parse(dateString)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Get the primary calendar ID
+    private fun getPrimaryCalendarId(): Long {
+        val projection = arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
+        val uri = CalendarContract.Calendars.CONTENT_URI
+        val cursor = requireContext().contentResolver.query(uri, projection, null, null, null)
+
+        cursor?.use {
+            if (it.moveToFirst()) {
+                return it.getLong(0)  // Return the first calendar ID found
+            }
+        }
+        return -1L
+    }
+
+    val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            permissions.entries.forEach {
+                Log.d("Permission", "${it.key} = ${it.value}")
+                if (it.key == Manifest.permission.WRITE_CALENDAR && it.value) {
+                    // Permission granted.  Start the show
+                    exportDutiesToGoogleCalendar()
+                } else {
+                    Toast.makeText(requireContext(), "Calendar permission is required to export duties", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+    private fun checkAndRequestCalendarPermission() {
+        // Check if permissions are already granted
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
+            // If permissions are granted, proceed with calendar export
+            exportDutiesToGoogleCalendar()
+        } else {
+            // Otherwise, request the permissions
+            requestPermissionLauncher.launch(
+                arrayOf(Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR)
+            )
+        }
+    }
+
+    // ---------------------------------------- Sync Roster Functions  -------------------------------------------------------------------- //
 
     private fun fetchRosterData(userID: String, passCode: String) {
         val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
@@ -268,7 +423,6 @@ class FragmentSettings : Fragment() {
     }
 
     private fun fetchFriendDataFromMySQL(userID: String) {
-
         val url = "http://flightschoolms.com/JRoster/getName.php"
         val requestBody = "userID=$userID"
         val client = OkHttpClient()
@@ -329,6 +483,8 @@ class FragmentSettings : Fragment() {
             }
         })
     }
+
+    // ---------------------------------------- Core Functions  -------------------------------------------------------------------- //
 
     private fun saveAction() {
         // Remove focus from the EditText
@@ -392,9 +548,28 @@ class FragmentSettings : Fragment() {
         })
     }
 
+    // ---------------------------------------- Boilerplate  -------------------------------------------------------------------- //
+
+    // Youll never guess.
     private fun isInternetAvailable(): Boolean {
-        // Implement network connectivity check here
-        return true
+        val connectivityManager = requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // Android 23+ >
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val activeNetwork = connectivityManager.activeNetwork ?: return false
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
+            return when {
+                networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+                networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+                networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+                else -> false
+            }
+        } else {
+            // Android < 23
+            @Suppress("DEPRECATION")
+            val activeNetworkInfo = connectivityManager.activeNetworkInfo
+            return activeNetworkInfo?.isConnected == true
+        }
     }
 
     private fun showAlert(title: String, message: String) {

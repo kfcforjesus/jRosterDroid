@@ -685,7 +685,7 @@ class RosterAdapter(
                 flightTimesTextView.text = "$localAtd$timeText - $localAta$timeText"
 
                 // Set the appropriate icon
-                val iconRes = iconMapping[activityText] ?: R.drawable.sim2 // Default airplane icon
+                val iconRes = iconMapping[activityText] ?: R.drawable.sim2
                 flightIcon.setImageResource(iconRes)
 
             // -------------- HANDLE SIGN ON ONLY --------------------------------------
@@ -703,8 +703,8 @@ class RosterAdapter(
 
                 flightRouteTextView.text = "Sign On"
                 flightDataTextView.text = ""
-                flightTimesTextView.text = localAtd+timeText // Only check-in time is shown
-                flightIcon.setImageResource(R.drawable.clock) // Icon for Sign On
+                flightTimesTextView.text = localAtd+timeText
+                flightIcon.setImageResource(R.drawable.clock)
 
                 flightDataTextView.isGone = true
 
