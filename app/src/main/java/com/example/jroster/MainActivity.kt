@@ -1,6 +1,5 @@
 package com.example.jroster
 
-import com.example.jroster.R
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -9,7 +8,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.jroster.SettingsActivity
+import com.bencornett.jroster.R
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException

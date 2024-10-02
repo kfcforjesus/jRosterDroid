@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
+import com.bencornett.jroster.R
 
 class FriendAdapter(
     private var friendList: List<Any>,

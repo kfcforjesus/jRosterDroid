@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.view.isGone
 import androidx.recyclerview.widget.RecyclerView
+import com.bencornett.jroster.R
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date

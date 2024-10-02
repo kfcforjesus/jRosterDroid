@@ -4,9 +4,10 @@ import android.content.Context
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import com.example.jroster.databinding.ActivitySettingsBinding
+import com.bencornett.jroster.databinding.ActivitySettingsBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import android.util.Log
+import com.bencornett.jroster.R
 
 class SettingsActivity : AppCompatActivity() {
 

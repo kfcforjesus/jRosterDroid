@@ -42,7 +42,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import java.util.*
 import android.icu.util.Calendar
-import android.icu.util.TimeZone
+import com.bencornett.jroster.R
 
 
 class FragmentSettings : Fragment() {

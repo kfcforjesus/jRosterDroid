@@ -5,17 +5,17 @@ plugins {
 }
 
 android {
-    namespace = "com.example.jroster"
+    namespace = "com.bencornett.jroster"
     compileSdk = 34
 
     viewBinding { enable = true }
 
     defaultConfig {
-        applicationId = "com.example.jroster"
+        applicationId = "com.bencornett.jroster"
         minSdk = 28
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

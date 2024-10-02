@@ -3,7 +3,6 @@ package com.example.jroster
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bencornett.jroster.R
 import com.example.jroster.GlobalVariables.globalFriendCode
 import com.example.jroster.GlobalVariables.globalFriendName
 import com.example.jroster.GlobalVariables.globalFriendUserID
