@@ -39,9 +39,10 @@ import android.net.Uri
 import android.os.Build
 import android.provider.CalendarContract
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.util.*
+import android.icu.util.Calendar
+import android.icu.util.TimeZone
 
 
 class FragmentSettings : Fragment() {
@@ -73,6 +74,7 @@ class FragmentSettings : Fragment() {
         logoutButton = view.findViewById(R.id.logoutButton)
         syncButton = view.findViewById(R.id.syncRosterButton)
         syncLabel = view.findViewById(R.id.lastSyncedTime)
+        baseSpinner = view.findViewById(R.id.baseSpinner)
 
         // Initialize radio buttons
         exportRadioGroup = view.findViewById(R.id.exportRadioGroup)
@@ -123,7 +125,7 @@ class FragmentSettings : Fragment() {
             val userID = sharedPreferences.getString("userID", "") ?: ""
             val passCode = sharedPreferences.getString("passCode", "") ?: ""
 
-            // Store the current timestamp (in milliseconds)
+            // Store the current timestamp
             val currentTime = System.currentTimeMillis()
             sharedPreferences.edit().putLong("lastSyncTime", currentTime).apply()
 
@@ -138,24 +140,6 @@ class FragmentSettings : Fragment() {
         exportOnButton.setOnClickListener {
             checkAndRequestCalendarPermission()
         }
-
-        // Add TextWatcher to handle save button visibility
-        nameEditText.addTextChangedListener(object : android.text.TextWatcher {
-            override fun afterTextChanged(s: android.text.Editable?) {
-                if (s?.isNotEmpty() == true) {
-                    baseLabel.visibility = View.GONE
-                    baseSpinner.visibility = View.GONE
-                    saveButton.visibility = View.VISIBLE
-                } else {
-                    saveButton.visibility = View.GONE
-                    baseLabel.visibility = View.VISIBLE
-                    baseSpinner.visibility = View.VISIBLE
-                }
-            }
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
 
         // Set up the save button click listener
         saveButton.setOnClickListener {
@@ -182,21 +166,48 @@ class FragmentSettings : Fragment() {
         val nameEditText = view.findViewById<EditText>(R.id.nameEditText)
 
         // Check for name in SharedPreferences
-        val storedName = sharedPreferences.getString("userName", null)
+        val storedName = sharedPreferences.getString("userName", "")
 
-        if (storedName != null) {
+        // Check if the storedName is not empty
+        if (!storedName.isNullOrEmpty()) {
             // If name exists in SharedPreferences, set it to the EditText
             nameEditText.setText(storedName)
+
+            // Since the name is set, hide the save button initially
+            saveButton.visibility = View.INVISIBLE
         } else {
             // If name does not exist, fetch from MySQL
             val userID = sharedPreferences.getString("userID", "") ?: ""
-            fetchFriendDataFromMySQL(userID)
+
+            if (userID.isNotEmpty()) {
+                // Fetch user data from MySQL if userID is available
+                fetchFriendDataFromMySQL(userID)
+            } else {
+                // Handle case when userID is not available
+                Toast.makeText(requireContext(), "User ID not found, unable to fetch data.", Toast.LENGTH_SHORT).show()
+            }
+
+            // Keep the save button invisible until name is entered or fetched
+            saveButton.visibility = View.INVISIBLE
         }
 
-        // Set save button visibility to invisible initially3
-        saveButton.visibility = View.INVISIBLE
+        // Edit Text listener
+        nameEditText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (s?.isNotEmpty() == true) {
+                    baseLabel.visibility = View.GONE
+                    baseSpinner.visibility = View.GONE
+                    saveButton.visibility = View.VISIBLE
+                } else {
+                    saveButton.visibility = View.GONE
+                    baseLabel.visibility = View.VISIBLE
+                    baseSpinner.visibility = View.VISIBLE
+                }
+            }
 
-
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
 
         // Load saved radio button state
         val isExportOn = sharedPreferences.getBoolean("isExportOn", false) // Default is 'false' (Off)
@@ -207,9 +218,6 @@ class FragmentSettings : Fragment() {
         } else {
             exportOffButton.isChecked = true
         }
-
-        // Initialize the base Spinner
-        baseSpinner = view.findViewById(R.id.baseSpinner)
 
         // Create an ArrayAdapter using the custom spinner item layout
         val adapter = ArrayAdapter.createFromResource(
@@ -245,20 +253,35 @@ class FragmentSettings : Fragment() {
         return view
     }
 
-    // ---------------------------------------- Calendar Functions  -------------------------------------------------------------------- //
+    // ---------------------------------------- Calendar Functions - This was a cunt -------------------------------------------------------- //
 
     // Handle the result of the permission request
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         if (requestCode == 100) {
+            // Check if permission was granted
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                exportDutiesToGoogleCalendar()
+                Log.d("PermissionResult", "Permissions granted.")
+                exportDutiesToGoogleCalendar()  // Export duties to the calendar
             } else {
-                Toast.makeText(requireContext(), "Calendar permission denied", Toast.LENGTH_SHORT).show()
+                Log.d("PermissionResult", "Permissions denied.")
+                Toast.makeText(requireContext(), "Calendar permission is required to export duties", Toast.LENGTH_SHORT).show()
             }
         }
     }
+
+    val baseTimeZoneMapping: Map<String, String> = mapOf(
+        "Sydney" to "Australia/Sydney",
+        "Brisbane" to "Australia/Brisbane",
+        "Melbourne" to "Australia/Melbourne",
+        "Cairns" to "Australia/Brisbane",
+        "Gold Coast" to "Australia/Brisbane",
+        "Adelaide" to "Australia/Adelaide",
+        "Avalon" to "Australia/Melbourne",
+        "Perth" to "Australia/Perth",
+        "SEQ" to "Australia/Brisbane"
+    )
 
     private fun exportDutiesToGoogleCalendar() {
         val eventUriString = "content://com.android.calendar/events"
@@ -269,62 +292,158 @@ class FragmentSettings : Fragment() {
             return
         }
 
-        // Fetch all DbData (your flight data) from the Room database
+        // Fetch user's base timezone from SharedPreferences
+        val userBase = sharedPreferences.getString("base", "Sydney") ?: "Sydney"
+        val timeZoneIdentifier = baseTimeZoneMapping[userBase] ?: "Australia/Sydney"
+        val userTimeZone = android.icu.util.TimeZone.getTimeZone(timeZoneIdentifier)
+
+        // Get the current date and calculate the date one month ago
+        val currentDate = Calendar.getInstance()
+        val oneMonthAgo = Calendar.getInstance().apply {
+            add(Calendar.MONTH, -1)  // Go back one month
+        }
+
+        // Fetch all DbData (flight data) from the Room database
         lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getInstance(requireContext())
-            val flights = db.dbDataDao().getAll() // Replace with your actual method for fetching all flights
+            val flights = db.dbDataDao().getAll()
 
             withContext(Dispatchers.Main) {
+                // Wipe all events first to avoid duplicates
+                deleteExistingCalendarEvents(calendarId)
+
                 // Loop through each flight and add events to the calendar
+                val eventsToInsert = mutableListOf<ContentValues>() // Array to collect all events
+
                 for (flight in flights) {
                     // Parse ATD (Actual Time of Departure) from string to Date
                     val atdDate = parseDate(flight.atd)
+
+                    // If the ATD date is null or older than one month, skip it
+                    if (atdDate == null || atdDate.before(oneMonthAgo.time)) {
+                        continue
+                    }
+
+                    // Skip specific duty types
+                    if (flight.activity == "PCK") continue
+
+                    // Log the flight activity for debugging
+                    Log.d("LOL", "Flight activity - ${flight.activity}")
+
+                    // Step 1: Normalize ATD to UTC by removing timezone offset
+                    val normalizedAtdUTC = normalizeToUTC(atdDate)
+
+                    // Step 2: Convert normalized UTC time to user's timezone
+                    val atdInUserTimeZone = convertUTCtoUserTimeZone(normalizedAtdUTC, userTimeZone)
                     val ataDate = parseDate(flight.ata)
+                    val ataInUserTimeZone = ataDate?.let { normalizeToUTC(it) }?.let { convertUTCtoUserTimeZone(it, userTimeZone) }
 
-                    // Check if ATD exists
-                    atdDate?.let { atd ->
-                        // Create flight event
-                        val flightEventValues = ContentValues().apply {
-                            put(CalendarContract.Events.CALENDAR_ID, calendarId)
-                            put(CalendarContract.Events.TITLE, flight.activity)
-                            put(CalendarContract.Events.DTSTART, atd.time)
-                            put(CalendarContract.Events.DTEND, ataDate?.time ?: atd.time + 3600000) // Default to 1-hour duration if ATA is not available
-                            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
-                            put(CalendarContract.Events.DESCRIPTION, "${flight.orig} to ${flight.dest}")
-                        }
-                        requireContext().contentResolver.insert(Uri.parse(eventUriString), flightEventValues)
+                    // Set the color of the activity
+                    val dutyColor = if (flight.activity in listOf("OFF", "LVE", "UFD", "DFD", "AOF", "FDO", "STR")) {
+                        R.color.titlePurple
+                    } else {
+                        R.color.orange
                     }
 
-                    // Optional: Add sign-on event
-                    val checkInDate = parseDate(flight.checkIn)
-                    checkInDate?.let {
-                        val signOnValues = ContentValues().apply {
-                            put(CalendarContract.Events.CALENDAR_ID, calendarId)
-                            put(CalendarContract.Events.TITLE, "Sign On")
-                            put(CalendarContract.Events.DTSTART, it.time)
-                            put(CalendarContract.Events.DTEND, it.time + 3600000) // 1 hour
-                            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
-                        }
-                        requireContext().contentResolver.insert(Uri.parse(eventUriString), signOnValues)
+                    // Collect flight event data into ContentValues for bulk insertion
+                    val flightEventValues = ContentValues().apply {
+                        put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                        put(CalendarContract.Events.TITLE, flight.activity)
+                        put(CalendarContract.Events.DTSTART, atdInUserTimeZone.time)
+                        put(CalendarContract.Events.DTEND, ataInUserTimeZone?.time ?: atdInUserTimeZone.time + 3600000) // Default to 1-hour if ATA is not available
+                        put(CalendarContract.Events.EVENT_TIMEZONE, userTimeZone.id)
+                        put(CalendarContract.Events.DESCRIPTION, "${flight.orig} to ${flight.dest}")
+                        put(CalendarContract.Events.EVENT_COLOR, ContextCompat.getColor(requireContext(), dutyColor))
                     }
+                    eventsToInsert.add(flightEventValues)
 
-                    // Optional: Add sign-off event
-                    val checkOutDate = parseDate(flight.checkOut)
-                    checkOutDate?.let {
-                        val signOffValues = ContentValues().apply {
-                            put(CalendarContract.Events.CALENDAR_ID, calendarId)
-                            put(CalendarContract.Events.TITLE, "Sign Off")
-                            put(CalendarContract.Events.DTSTART, it.time)
-                            put(CalendarContract.Events.DTEND, it.time + 3600000) // 1 hour
-                            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+                    // Handle sign-on and sign-off events similarly, but skip "STB" and "AVL" duties
+                    if (flight.activity != "STB" && flight.activity != "AVL") {
+                        flight.checkIn?.let { checkInStr ->
+                            val checkInDate = parseDate(checkInStr)
+                            val normalizedCheckInUTC = checkInDate?.let { normalizeToUTC(it) }
+                            val checkInInUserTimeZone = normalizedCheckInUTC?.let { convertUTCtoUserTimeZone(it, userTimeZone) }
+
+                            checkInInUserTimeZone?.let { checkIn ->
+                                val signOnValues = ContentValues().apply {
+                                    put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                                    put(CalendarContract.Events.TITLE, "Sign On")
+                                    put(CalendarContract.Events.DTSTART, checkIn.time)
+                                    put(CalendarContract.Events.DTEND, checkIn.time + 3600000)
+                                    put(CalendarContract.Events.EVENT_TIMEZONE, userTimeZone.id)
+                                    put(CalendarContract.Events.EVENT_COLOR, ContextCompat.getColor(requireContext(), R.color.orange))
+                                }
+                                eventsToInsert.add(signOnValues)
+                            }
                         }
-                        requireContext().contentResolver.insert(Uri.parse(eventUriString), signOffValues)
+
+                        flight.checkOut?.let { checkOutStr ->
+                            val checkOutDate = parseDate(checkOutStr)
+                            val normalizedCheckOutUTC = checkOutDate?.let { normalizeToUTC(it) }
+                            val checkOutInUserTimeZone = normalizedCheckOutUTC?.let { convertUTCtoUserTimeZone(it, userTimeZone) }
+
+                            checkOutInUserTimeZone?.let { checkOut ->
+                                val signOffValues = ContentValues().apply {
+                                    put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                                    put(CalendarContract.Events.TITLE, "Sign Off")
+                                    put(CalendarContract.Events.DTSTART, checkOut.time)
+                                    put(CalendarContract.Events.DTEND, checkOut.time + 3600000)
+                                    put(CalendarContract.Events.EVENT_TIMEZONE, userTimeZone.id)
+                                    put(CalendarContract.Events.EVENT_COLOR, ContextCompat.getColor(requireContext(), R.color.orange))
+                                }
+                                eventsToInsert.add(signOffValues)
+                            }
+                        }
                     }
+                }
+
+                // Insert all events in bulk to improve performance
+                for (eventValues in eventsToInsert) {
+                    requireContext().contentResolver.insert(Uri.parse(eventUriString), eventValues)
                 }
 
                 Toast.makeText(requireContext(), "Duties exported to Google Calendar", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // Function to normalize the date to UTC by removing the timezone offset
+    private fun normalizeToUTC(date: Date): Date {
+        val calendar = Calendar.getInstance().apply {
+            time = date
+        }
+        val offsetInMillis = calendar.timeZone.getOffset(calendar.timeInMillis)
+        calendar.add(Calendar.MILLISECOND, +offsetInMillis)
+        return calendar.time
+    }
+
+    // Convert to users local time
+    private fun convertUTCtoUserTimeZone(date: Date, timeZone: android.icu.util.TimeZone): Date {
+        val calendar = android.icu.util.Calendar.getInstance(android.icu.util.TimeZone.getTimeZone("UTC")).apply {
+            time = date
+        }
+        calendar.timeZone = timeZone
+        return calendar.time
+    }
+
+    // Kill < 1 month calendar events to avoid duplicates
+    private fun deleteExistingCalendarEvents(calendarId: Long) {
+        val eventUri = CalendarContract.Events.CONTENT_URI
+
+        // Determine a month ago
+        val oneMonthAgo = Calendar.getInstance().apply {
+            add(Calendar.MONTH, -1)
+        }
+
+        // Build the selection criteria to filter events by calendar ID and date
+        val selection = "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DTSTART} >= ?"
+        val selectionArgs = arrayOf(
+            calendarId.toString(),
+            oneMonthAgo.timeInMillis.toString()
+        )
+
+        // Death to new events
+        requireContext().contentResolver.delete(eventUri, selection, selectionArgs)
     }
 
     // Helper function to parse date strings
@@ -368,10 +487,13 @@ class FragmentSettings : Fragment() {
         // Check if permissions are already granted
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
-            // If permissions are granted, proceed with calendar export
+
+            // Permissions are already granted, proceed with calendar export
+            Log.d("PermissionCheck", "Permissions already granted.")
             exportDutiesToGoogleCalendar()
         } else {
-            // Otherwise, request the permissions
+            // Request the necessary permissions
+            Log.d("PermissionCheck", "Requesting permissions.")
             requestPermissionLauncher.launch(
                 arrayOf(Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR)
             )
