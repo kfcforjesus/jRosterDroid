@@ -94,16 +94,19 @@ class FragmentSettings : Fragment() {
 
         // Set an OnClickListener for the button
         instructionsButton.setOnClickListener {
-            // Get access to SharedPreferences
-            val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+            val dialogView = layoutInflater.inflate(R.layout.dialog_instructions, null)
 
-            // Clear all the stored preferences
-            val editor = sharedPreferences.edit()
-            editor.clear()
-            editor.apply()
+            val instructionsDialog = AlertDialog.Builder(requireContext())
+                .setView(dialogView)
+                .setCancelable(false)
+                .create()
 
-            // Notify the user
-            Toast.makeText(requireContext(), "All preferences have been cleared!", Toast.LENGTH_SHORT).show()
+            // Close button logic
+            dialogView.findViewById<Button>(R.id.close_button).setOnClickListener {
+                instructionsDialog.dismiss()
+            }
+
+            instructionsDialog.show()
         }
 
         // Set a click listener for the logout button
@@ -139,6 +142,20 @@ class FragmentSettings : Fragment() {
         // When exportOnButton is selected, trigger the calendar export process
         exportOnButton.setOnClickListener {
             checkAndRequestCalendarPermission()
+        }
+
+        // Export Button selected off
+        exportOffButton.setOnClickListener {
+            // Get the calendar ID
+            val calendarId = getPrimaryCalendarId()
+
+            // Check for valid calendar then kill it
+            if (calendarId != -1L) {
+                deleteAllCalendarEvents(calendarId)
+                Toast.makeText(requireContext(), "All exported calendar events deleted", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), "No calendar found to delete events", Toast.LENGTH_SHORT).show()
+            }
         }
 
         // Set up the save button click listener
@@ -406,6 +423,19 @@ class FragmentSettings : Fragment() {
             }
         }
     }
+
+    // Function to delete all calendar events created by the app
+    private fun deleteAllCalendarEvents(calendarId: Long) {
+        val eventUri = CalendarContract.Events.CONTENT_URI
+
+        // Selection to find all events in the app's specific calendar
+        val selection = "${CalendarContract.Events.CALENDAR_ID} = ?"
+        val selectionArgs = arrayOf(calendarId.toString())
+
+        // Use the content resolver to delete all events in this calendar
+        requireContext().contentResolver.delete(eventUri, selection, selectionArgs)
+    }
+
 
     // Function to normalize the date to UTC by removing the timezone offset
     private fun normalizeToUTC(date: Date): Date {

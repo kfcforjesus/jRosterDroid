@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/white"
+    android:elevation="4dp"
+    android:layout_gravity="center"
+    android:gravity="center"
+    android:backgroundTint="@color/white">
+
+    <TextView
+        android:id="@+id/instructions_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Instructions"
+        android:textAlignment="center"
+        android:textSize="20sp"
+        android:textColor="@color/gray"
+        android:paddingBottom="8dp"
+        android:fontFamily="sans-serif-medium" />
+
+    <TextView
+        android:id="@+id/instructions_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="JRoster automatically syncs the roster whenever you view it. The Sync Roster button allows you to force a sync if required.\n\nJRoster displays rosters that have been imported via JTools.\n\nAdding your name allows your friends to identify you. Otherwise, all they will see is your ID number.  Ensure you set your home base so local times are correct.\n\nTo add a friend or view their roster, tap on the friends tab. Your friends can add you via your 'friend code,' which is displayed in JTools."
+        android:textColor="@android:color/black"
+        android:textSize="16sp"
+        android:paddingBottom="16dp" />
+
+    <Button
+        android:id="@+id/close_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Close"
+        android:backgroundTint="@color/titlePurple"
+        android:textColor="@android:color/white"
+        android:padding="8dp" />
+</LinearLayout>
