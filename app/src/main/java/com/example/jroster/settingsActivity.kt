@@ -1,4 +1,4 @@
-package com.example.jroster
+package com.bencornett.jroster
 
 import android.content.Context
 import android.os.Bundle
@@ -8,6 +8,9 @@ import com.bencornett.jroster.databinding.ActivitySettingsBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import android.util.Log
 import com.bencornett.jroster.R
+import com.example.jroster.FragmentFriends
+import com.example.jroster.FragmentRoster
+import com.example.jroster.FragmentSettings
 
 class SettingsActivity : AppCompatActivity() {
 

@@ -1,4 +1,4 @@
-package com.example.jroster
+package com.bencornett.jroster
 
 import android.content.Intent
 import android.content.SharedPreferences
