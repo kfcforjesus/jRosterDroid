@@ -1,4 +1,4 @@
-package com.example.jroster
+package com.bencornett.jroster
 
 object GlobalVariables {
     var globalFriendUserID: String? = null

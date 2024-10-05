@@ -21,6 +21,10 @@ object RetrofitClient {
         retrofit.create(RosterApiService::class.java)
     }
 
+    val passcodeApiService: PasscodeApiService by lazy {
+        retrofit.create(PasscodeApiService::class.java)
+    }
+
     // Friend API Service
     val friendApiService: FriendApiService by lazy {
         retrofit.create(FriendApiService::class.java)

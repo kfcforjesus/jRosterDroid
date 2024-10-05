@@ -18,10 +18,10 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bencornett.jroster.R
-import com.example.jroster.GlobalVariables.globalFriendCode
-import com.example.jroster.GlobalVariables.globalFriendName
-import com.example.jroster.GlobalVariables.globalFriendUserID
-import com.example.jroster.GlobalVariables.isFriendMode
+import com.bencornett.jroster.GlobalVariables.globalFriendCode
+import com.bencornett.jroster.GlobalVariables.globalFriendName
+import com.bencornett.jroster.GlobalVariables.globalFriendUserID
+import com.bencornett.jroster.GlobalVariables.isFriendMode
 import com.zires.switchsegmentedcontrol.ZiresSwitchSegmentedControl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,8 +69,8 @@ class FragmentRoster : Fragment() {
         // Set the initial checked state based on saved preference
         segmentSwitch.setChecked(switchState)
 
-        // Fetch the current state of the segment control (local or home time) based on the switchState
-        val useHomeTime = switchState  // When the switch is unchecked (left), use local time
+        //  When the switch is unchecked (left), use local time
+        val useHomeTime = switchState
 
         // Divider setup
         val dividerDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.divider)
@@ -146,8 +146,21 @@ class FragmentRoster : Fragment() {
                 Toast.makeText(requireContext(), "No friend data found", Toast.LENGTH_SHORT).show()
             }
         } else {
-            // Populate the user's roster
-            populateRoster(useHomeTime)
+            // Check the time of the last roster update
+            val lastUpdateTime = sharedPreferences.getLong("lastUpdateTime", 0L)
+            val currentTime = System.currentTimeMillis()
+            val timeDiff = currentTime - lastUpdateTime
+
+            // Only update from MySQL at intervals > 30 minutes to stop hammering
+            if (timeDiff >= 1800000) {
+                populateRoster(useHomeTime)
+
+                // Update the last run time
+                sharedPreferences.edit().putLong("lastUpdateTime", currentTime).apply()
+            } else {
+                // Otherwise, just load from the local database
+                loadLocalData(useHomeTime)
+            }
         }
 
         return view
@@ -155,6 +168,31 @@ class FragmentRoster : Fragment() {
 
     // ---------------------------------------- Functions to handle the user -------------------------------------------------------------------- //
 
+    // Same as populate roster but doesn't update via MySQL.  Inefficient but CBF
+    private fun loadLocalData(useHomeTime: Boolean) {
+        rosterTitle.setText( "My Roster")
+        rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
+
+        // Reinstate the time toggle
+        segmentSwitch.isVisible = true
+        exitButton.isGone = true
+
+        // Load data from local database first (using IO thread)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.getInstance(requireContext())
+            val rosterEntriesFromDb = db.dbDataDao().getAll()
+
+            // Process entries for Sign On
+            val processedEntries = processEntriesForSignOn(rosterEntriesFromDb)
+
+            withContext(Dispatchers.Main) {
+                // Update the UI on the main thread
+                updateRecyclerView(processedEntries, useHomeTime)
+            }
+        }
+    }
+
+    // Proper data population func.
     private fun populateRoster(useHomeTime: Boolean) {
         rosterTitle.setText( "My Roster")
         rosterTitle.setTextColor(Color.parseColor("#6A5ACD"))
@@ -185,6 +223,7 @@ class FragmentRoster : Fragment() {
         }
     }
 
+    // mysql pull
     private fun fetchRosterData(userID: String, passCode: String, useHomeTime: Boolean) {
         val call = RetrofitClient.rosterApiService.getRosterData(userID, passCode)
 
@@ -486,7 +525,6 @@ class FragmentRoster : Fragment() {
             recyclerView.scrollToPosition(it)
         }
     }
-
 
     // ---------------------------------------- Boiler plate  -------------------------------------------------------------------- //
 

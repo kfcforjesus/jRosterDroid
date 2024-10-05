@@ -12,6 +12,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -26,6 +27,7 @@ import retrofit2.Response
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.view.isGone
+import com.bencornett.jroster.GlobalVariables
 import com.bencornett.jroster.R
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.withContext
@@ -43,6 +45,7 @@ class FragmentFriends : Fragment() {
     private lateinit var daysOffButton: Button //
     private lateinit var friendAdapter: FriendAdapter
     private lateinit var optionBox: LinearLayout
+    private lateinit var versionText: TextView
     private val daysOffCodes = listOf("OFF", "WOF", "FDO", "ROF", "7OF", "APO", "CDO", "EOF", "EWD", "FOF", "LOF", "MOF", "NDM", "NOF", "OBA", "OFR", "PHO", "POF", "RO1", "SOF", "STR", "UOF", "WDL", "WDS", "XMS", "XOF", "AOF", "A0F")
 
     override fun onCreateView(
@@ -58,6 +61,7 @@ class FragmentFriends : Fragment() {
         optionBox = view.findViewById(R.id.optionBox)
         viewRosterButton = view.findViewById(R.id.viewRosterButton)
         daysOffButton = view.findViewById(R.id.daysOffButton)
+        versionText = view.findViewById(R.id.versionText)
 
         // Set up RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -102,6 +106,9 @@ class FragmentFriends : Fragment() {
 
         // Update the table from the DB
         updateRecyclerView()
+
+        // Set the users friend code for easy viewing
+        setFriendCode()
 
         return view
     }
@@ -183,7 +190,6 @@ class FragmentFriends : Fragment() {
 
     // Step 4 - Fetch friend's flights (roster) data from MySQL
     private fun fetchFriendFlightsFromMySQL(friendUserID: String, friendCode: String) {
-        Log.d("MutualDaysOffDebug", "Fetching flights for friendUserID: $friendUserID, friendCode: $friendCode")
 
         // Call the API to fetch friend's flights
         val flightCall = RetrofitClient.rosterApiService.getFriendRosterData(friendUserID, friendCode)
@@ -194,7 +200,7 @@ class FragmentFriends : Fragment() {
                     val flightList = response.body()
 
                     if (flightList != null && flightList.isNotEmpty()) {
-                        insertFriendFlightsIntoDatabase(flightList, friendCode)  // Pass friendCode here
+                        insertFriendFlightsIntoDatabase(flightList, friendCode)
                     } else {
                         Toast.makeText(requireContext(), "No flights found for this friend", Toast.LENGTH_SHORT).show()
                     }
@@ -297,6 +303,54 @@ class FragmentFriends : Fragment() {
             }
         } else {
             Toast.makeText(requireContext(), "Please select a friend first.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Set the users friendcode.  Need a mysql pull for this
+    private fun setFriendCode() {
+        val apiService = RetrofitClient.passcodeApiService
+        val sharedPreferences = requireContext().getSharedPreferences("userPrefs", Context.MODE_PRIVATE)
+        val userID = sharedPreferences.getString("userID", "123") ?: "123"
+        val passcode = sharedPreferences.getString("passCode", "456") ?: "456"
+        val friendCodeString = sharedPreferences.getString("friendCode", "null") ?: "null"
+
+        // Only make the MySQL request if friendCode in SharedPreferences is "null"
+        if (friendCodeString == "null") {
+            val call = apiService.getFriendCode(userID, passcode)
+
+            call.enqueue(object : Callback<List<Map<String, String>>> {
+                override fun onResponse(call: Call<List<Map<String, String>>>, response: Response<List<Map<String, String>>>) {
+                    if (response.isSuccessful) {
+                        val friendsList = response.body()
+
+                        // Ensure you have results to process
+                        friendsList?.let {
+                            if (it.isNotEmpty()) {
+                                val friendCode = it[0]["friendCode"]
+
+                                // Save friendCode to SharedPreferences
+                                val editor = sharedPreferences.edit()
+                                editor.putString("friendCode", friendCode)
+                                editor.apply()
+
+                                // Write the label
+                                versionText.setText("My Code : ${friendCode}")
+                            } else {
+                                Log.e("Retrofit", "No friend code found in response")
+                            }
+                        }
+                    } else {
+                        Log.e("Retrofit", "Error response code: ${response.code()}")
+                    }
+                }
+
+                override fun onFailure(call: Call<List<Map<String, String>>>, t: Throwable) {
+                    Log.e("Retrofit", "Request failed: ${t.message}")
+                }
+            })
+        } else {
+            // Friend code already exists, don't bother with mysql pull
+            versionText.setText("My Code : $friendCodeString")
         }
     }
 
