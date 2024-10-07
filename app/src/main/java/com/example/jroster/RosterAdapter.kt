@@ -105,7 +105,7 @@ class RosterAdapter(
         return 0  // Default to the first position if the date is not found
     }
 
-    // This should be inside your RosterAdapter class
+    // Local list position
     fun getDateForPosition(position: Int): String {
         var currentPos = 0
         for (date in sortedDates) {
@@ -177,8 +177,8 @@ class RosterAdapter(
             // Set text color based on whether the date is in the past (maintain previous functionality)
             dateTextView.setTextColor(
                 when {
-                    isPastDate -> Color.GRAY // Use light gray for past dates
-                    else -> Color.parseColor("#3F51B5") // Indigo for future/today
+                    isPastDate -> Color.GRAY
+                    else -> Color.parseColor("#3F51B5")
                 }
             )
 
@@ -214,6 +214,8 @@ class RosterAdapter(
                 "STB" to "Standby",
                 "DBF" to "Debrief",
                 "FTG" to "Fatigue",
+                "PAT" to "Paternity Leave",
+                "MAT" to "Maturnity Leave",
                 "FDO" to "Fixed Day Off",
                 "UFD" to "UFD",
                 "LVE" to "Leave",
@@ -431,6 +433,7 @@ class RosterAdapter(
                 "" to "Australia/Melbourne"
             )
 
+            // Base mapping
             val iataMapping = listOf(
                 "Sydney" to "SYD",
                 "Melbourne" to "MEL",
@@ -525,7 +528,7 @@ class RosterAdapter(
             }
 
             // Format the Roster Duties
-            if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO", "FTG", "STR").contains(entry.activity)) {
+            if (listOf("OFF", "LVE", "UFD", "DFD", "AOF", "XSB", "FDO", "FTG", "STR", "PAT", "MAT").contains(entry.activity)) {
 
                 // Move flightRouteTextView down by 8 pixels
                 val layoutParams = flightRouteTextView.layoutParams as ViewGroup.MarginLayoutParams
@@ -538,14 +541,14 @@ class RosterAdapter(
 
                 // Set specific behavior for "Sign on" activity
                 flightRouteTextView.text = activityMapping[entry.activity]
-                flightDataTextView.text = ""  // Clear any other activity details
+                flightDataTextView.text = ""
                 flightTimesTextView.text = ""
 
                 iconMapping[entry.activity]?.let {
                     flightIcon.setImageResource(it)
                 } ?: run {
                     // Fallback option if no matching icon is found
-                    flightIcon.setImageResource(R.drawable.house) // Replace with your default icon
+                    flightIcon.setImageResource(R.drawable.house)
                 }
 
                 flightDataTextView.isGone = true
@@ -563,7 +566,7 @@ class RosterAdapter(
                     flightIcon.setImageResource(it)
                 } ?: run {
                     // Fallback option if no matching icon is found
-                    flightIcon.setImageResource(R.drawable.house) // Replace with your default icon
+                    flightIcon.setImageResource(R.drawable.house)
                 }
 
                 flightDataTextView.isGone = true
@@ -598,7 +601,7 @@ class RosterAdapter(
                 flightTimesTextView.text = localAtd+timeText // Only check-in time is shown
 
                 // Set the appropriate icon
-                val iconRes = R.drawable.bus // Default airplane icon
+                val iconRes = R.drawable.bus
 
                 flightIcon.setImageResource(iconRes)
 
